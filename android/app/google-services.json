@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "459361316888",
+    "project_id": "notube-ee552",
+    "storage_bucket": "notube-ee552.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:459361316888:android:6dd917149ee21c3839d36d",
+        "android_client_info": {
+          "package_name": "me.rooshi.notube"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "459361316888-fuajljub9rqc1ptpqj0brq99o5s3uo00.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD2NapFcFq5_KY_9sYQJlgKW6ExyknLmw4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "459361316888-fuajljub9rqc1ptpqj0brq99o5s3uo00.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
