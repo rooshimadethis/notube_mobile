@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../models/alternative.dart';
+import 'package:notube_shared/alternative.pb.dart';
 
 class AlternativeCard extends StatelessWidget {
   final Alternative alternative;

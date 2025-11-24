@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/alternative.dart';
+import 'package:notube_shared/alternative.pb.dart';
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -12,7 +12,7 @@ class FirestoreService {
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
         if (data.containsKey('alternatives')) {
           List<dynamic> alts = data['alternatives'];
-          return alts.map((e) => Alternative.fromJson(e)).toList();
+          return alts.map((e) => Alternative()..mergeFromJsonMap(e)).toList();
         }
       }
       return [];

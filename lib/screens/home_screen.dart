@@ -3,7 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import '../models/alternative.dart';
+import 'package:flutter/services.dart';
+import 'package:notube_shared/alternative.pb.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../widgets/alternative_card.dart';
@@ -29,8 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
 
-    final user = context.read<AuthService>().user;
-    // We need to listen to the user stream or check current user
+    // Check current user
     final currentUser = FirebaseAuth.instance.currentUser;
 
     if (currentUser != null) {
@@ -58,26 +58,33 @@ class _HomeScreenState extends State<HomeScreen> {
     if (localData != null) {
       final List<dynamic> decoded = jsonDecode(localData);
       setState(() {
-        _alternatives = decoded.map((e) => Alternative.fromJson(e)).toList();
+        _alternatives = decoded.map((e) => Alternative()..mergeFromJsonMap(e)).toList();
         _isLoading = false;
       });
     } else {
       // Load defaults (hardcoded for now as we can't easily read assets without setup)
       // In a real app, we'd load from assets/alternatives.json
-      setState(() {
-        _alternatives = [
-          Alternative(title: "Kindle Cloud Reader", url: "https://read.amazon.com", description: "Read your kindle books directly in the browser.", category: "books"),
-          Alternative(title: "Unsplash", url: "https://unsplash.com", description: "Beautiful, free images and photos that you can download and use for any project.", category: "photography"),
-          Alternative(title: "GitHub", url: "https://github.com", description: "Where the world builds software.", category: "software"),
-        ];
-        _isLoading = false;
-      });
+      // Load defaults from package assets
+      try {
+        final String jsonString = await rootBundle.loadString('packages/notube_shared/assets/default_alternatives.json');
+        final List<dynamic> decoded = jsonDecode(jsonString);
+        setState(() {
+          _alternatives = decoded.map((e) => Alternative()..mergeFromJsonMap(e)).toList();
+          _isLoading = false;
+        });
+      } catch (e) {
+        print("Error loading default alternatives: $e");
+        setState(() {
+          _alternatives = [];
+          _isLoading = false;
+        });
+      }
     }
   }
 
   Future<void> _saveToLocal(List<Alternative> items) async {
     final prefs = await SharedPreferences.getInstance();
-    final String encoded = jsonEncode(items.map((e) => e.toJson()).toList());
+    final String encoded = jsonEncode(items.map((e) => e.writeToJsonMap()).toList());
     await prefs.setString('localItems', encoded);
   }
 
