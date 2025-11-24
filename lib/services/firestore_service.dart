@@ -13,9 +13,12 @@ class FirestoreService {
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
         if (data.containsKey('alternatives')) {
           List<dynamic> alts = data['alternatives'];
-          return alts.map((e) => Alternative()..mergeFromJsonMap(e)).toList();
+          final parsed = alts.map((e) => Alternative()..mergeFromProto3Json(e)).toList();
+          developer.log("Fetched ${parsed.length} alternatives from Firestore for user $userId");
+          return parsed;
         }
       }
+      developer.log("No alternatives found for user $userId");
       return [];
     } catch (e) {
       developer.log("Error fetching alternatives: $e");
@@ -46,16 +49,24 @@ class FirestoreService {
 
     // 1. Add all cloud items (they win conflicts)
     for (var item in cloud) {
-      if (item.url.isNotEmpty) {
-        mergedMap[item.url] = item;
+      final key = item.url.isNotEmpty ? item.url : item.title;
+      if (key.isNotEmpty) {
+        mergedMap[key] = item;
+      } else {
+        // If absolutely no identifier, keep it (using hash as temporary key)
+        mergedMap['cloud_${item.hashCode}'] = item;
       }
     }
 
     // 2. Add local items only if they don't exist in cloud
     for (var item in local) {
-      if (item.url.isNotEmpty && !mergedMap.containsKey(item.url)) {
-        mergedMap[item.url] = item;
+      final key = item.url.isNotEmpty ? item.url : item.title;
+      if (key.isNotEmpty) {
+         if (!mergedMap.containsKey(key)) {
+           mergedMap[key] = item;
+         }
       }
+      // If local item has no identifier, we skip it to avoid duplicates/garbage
     }
 
     return mergedMap.values.toList();

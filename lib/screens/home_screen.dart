@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:flutter/services.dart';
 import 'package:notube_shared/alternative.pb.dart';
 import '../services/auth_service.dart';
@@ -21,17 +22,22 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<Alternative> _alternatives = [];
   bool _isLoading = true;
-  bool _hasLoadedFromCloud = false; // Track if we've successfully loaded from cloud
   Timer? _debounceTimer;
+  StreamSubscription? _authSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    // Listen to auth changes to reload data automatically
+    _authSubscription = context.read<AuthService>().user.listen((_) {
+      _loadData();
+    });
   }
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _debounceTimer?.cancel();
     super.dispose();
   }
@@ -61,27 +67,21 @@ class _HomeScreenState extends State<HomeScreen> {
             // Use the service's merge logic (Cloud wins)
             final mergedItems = firestoreService.mergeAlternatives(currentItems, cloudItems);
             
-            // Mark that we've successfully loaded from cloud
-            _hasLoadedFromCloud = true;
-            
             // Update state and save to local, but DON'T save to cloud yet
             // (we just loaded from cloud, no need to save back)
             _setAlternativesFromLoad(mergedItems);
           }
         } catch (e) {
-          print("Firestore load failed (or timed out): $e");
+          developer.log("Firestore load failed (or timed out): $e");
           // Don't set _hasLoadedFromCloud = true on error
           // This prevents local data from overwriting cloud data
         }
-      } else {
-        // Not logged in, so we can't have loaded from cloud
-        _hasLoadedFromCloud = false;
       }
       
       if (mounted) setState(() => _isLoading = false);
 
     } catch (e) {
-      print("Critical error in _loadData: $e");
+      developer.log("Critical error in _loadData: $e");
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -98,28 +98,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _saveToLocal(newItems);
   }
 
-  void _updateAlternatives(List<Alternative> newItems) {
-    if (!mounted) return;
-    
-    setState(() {
-      _alternatives = newItems;
-    });
-    
-    // 1. Save to local immediately
-    _saveToLocal(newItems);
-    
-    // 2. Debounce save to cloud - BUT ONLY if we've successfully loaded from cloud first
-    // This prevents overwriting cloud data with incomplete local data during app startup
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null && _hasLoadedFromCloud) {
-      _debounceTimer?.cancel();
-      _debounceTimer = Timer(const Duration(seconds: 1), () {
-        if (mounted) {
-          context.read<FirestoreService>().saveUserAlternatives(user.uid, newItems);
-        }
-      });
-    }
-  }
+  // Unused but kept for reference if editing is added back
+  // void _updateAlternatives(List<Alternative> newItems) { ... }
 
   Future<List<Alternative>> _getLocalAlternatives() async {
     try {
@@ -130,11 +110,11 @@ class _HomeScreenState extends State<HomeScreen> {
         try {
           final decoded = jsonDecode(localData);
           if (decoded is List && decoded.isNotEmpty) {
-             final items = decoded.map((e) => Alternative()..mergeFromJsonMap(e)).toList();
+             final items = decoded.map((e) => Alternative()..mergeFromProto3Json(e)).toList();
              if (items.isNotEmpty) return items;
           }
         } catch (e) {
-          print("Error parsing local cached data: $e");
+          developer.log("Error parsing local cached data: $e");
         }
       }
 
@@ -149,7 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (items.isNotEmpty) return items;
       }
     } catch (e) {
-      print("Error loading local/assets: $e");
+      developer.log("Error loading local/assets: $e");
     }
 
     return [];
@@ -161,8 +141,20 @@ class _HomeScreenState extends State<HomeScreen> {
       final String encoded = jsonEncode(items.map((e) => e.writeToJsonMap()).toList());
       await prefs.setString('localItems', encoded);
     } catch (e) {
-      print("Error saving to local: $e");
+      developer.log("Error saving to local: $e");
     }
+  }
+
+  Map<String, List<Alternative>> _groupAlternatives(List<Alternative> alternatives) {
+    final grouped = <String, List<Alternative>>{};
+    for (var alt in alternatives) {
+      final category = alt.category.isEmpty ? 'Others' : alt.category;
+      if (!grouped.containsKey(category)) {
+        grouped[category] = [];
+      }
+      grouped[category]!.add(alt);
+    }
+    return grouped;
   }
 
   @override
@@ -189,9 +181,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 context.read<AuthService>().signOut();
                 setState(() {
                   _alternatives = []; // Clear data to force reload defaults
-                  _hasLoadedFromCloud = false; // Reset cloud load flag
                 });
-                _loadData();
+                // _loadData(); // Handled by auth subscription
               },
             )
           else
@@ -199,7 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
-                ).then((_) => _loadData());
+                );
               },
               child: const Text('Sign In', style: TextStyle(color: Colors.indigoAccent)),
             ),
@@ -226,12 +217,30 @@ class _HomeScreenState extends State<HomeScreen> {
                 )
               : RefreshIndicator(
                   onRefresh: _loadData,
-                  child: ListView.builder(
+                  child: ListView(
                     padding: const EdgeInsets.only(bottom: 20),
-                    itemCount: _alternatives.length,
-                    itemBuilder: (context, index) {
-                      return AlternativeCard(alternative: _alternatives[index]);
-                    },
+                    children: _groupAlternatives(_alternatives).entries.map((entry) {
+                      final category = entry.key;
+                      final items = entry.value;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                            child: Text(
+                              category.toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                          ),
+                          ...items.map((alt) => AlternativeCard(alternative: alt)),
+                        ],
+                      );
+                    }).toList(),
                   ),
                 ),
     );
