@@ -102,12 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final decoded = jsonDecode(jsonString);
       if (decoded is List && decoded.isNotEmpty) {
         final items = decoded.map((e) {
-          final map = Map<String, dynamic>.from(e);
-          return Alternative()
-            ..title = map['title'] ?? ''
-            ..description = map['description'] ?? ''
-            ..url = map['url'] ?? ''
-            ..category = map['category'] ?? '';
+          return Alternative()..mergeFromProto3Json(e);
         }).toList();
 
         if (items.isNotEmpty) {
@@ -122,43 +117,12 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       print("Error loading local/assets: $e");
-      // Fall through to hardcoded defaults
     }
 
-    // Fallback to hardcoded defaults if asset load fails
-    try {
-      final List<Alternative> hardcodedDefaults = [
-        Alternative()
-          ..title = 'Unsplash'
-          ..description = 'Beautiful, free images and photos.'
-          ..url = 'https://unsplash.com'
-          ..category = 'photography',
-        Alternative()
-          ..title = 'Audible'
-          ..description = 'Listen to audiobooks and podcasts.'
-          ..url = 'https://www.audible.com'
-          ..category = 'books',
-        Alternative()
-          ..title = 'GitHub'
-          ..description = 'Where the world builds software.'
-          ..url = 'https://github.com'
-          ..category = 'software',
-      ];
-
-      if (mounted) {
-        setState(() {
-          _alternatives = hardcodedDefaults;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      print("Critical error setting hardcoded defaults: $e");
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          // _alternatives remains empty, triggering the empty state UI
-        });
-      }
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
