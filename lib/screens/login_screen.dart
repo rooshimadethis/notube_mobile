@@ -26,7 +26,9 @@ class _LoginScreenState extends State<LoginScreen> {
             _emailController.text.trim(),
             _passwordController.text.trim(),
           );
-      // Navigation is handled by the auth state stream in main.dart
+      if (mounted) {
+        Navigator.pop(context);
+      }
     } catch (e) {
       setState(() {
         _errorMessage = e.toString();
@@ -48,6 +50,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await context.read<AuthService>().signInWithGoogle();
+      if (mounted) {
+        Navigator.pop(context);
+      }
     } catch (e) {
       setState(() {
         _errorMessage = e.toString();
