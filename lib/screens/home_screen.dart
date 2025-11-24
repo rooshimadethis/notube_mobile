@@ -101,16 +101,24 @@ class _HomeScreenState extends State<HomeScreen> {
           'packages/notube_shared/assets/default_alternatives.json');
       final decoded = jsonDecode(jsonString);
       if (decoded is List && decoded.isNotEmpty) {
-          final items = decoded.map((e) => Alternative()..mergeFromJsonMap(e)).toList();
-          if (items.isNotEmpty) {
-            if (mounted) {
-              setState(() {
-                _alternatives = items;
-                _isLoading = false;
-              });
-            }
-            return;
+        final items = decoded.map((e) {
+          final map = Map<String, dynamic>.from(e);
+          return Alternative()
+            ..title = map['title'] ?? ''
+            ..description = map['description'] ?? ''
+            ..url = map['url'] ?? ''
+            ..category = map['category'] ?? '';
+        }).toList();
+
+        if (items.isNotEmpty) {
+          if (mounted) {
+            setState(() {
+              _alternatives = items;
+              _isLoading = false;
+            });
           }
+          return;
+        }
       }
     } catch (e) {
       print("Error loading local/assets: $e");
