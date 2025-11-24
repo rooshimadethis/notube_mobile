@@ -1,5 +1,8 @@
 # NoTube Mobile
 
+TODO:
+ - [ ] Add a "share" option to this app which adds it to the list of alternatives
+
 A new Flutter project.
 
 ## Getting Started
