@@ -32,46 +32,65 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Check current user
-      final currentUser = FirebaseAuth.instance.currentUser;
+      // 1. Get local/default items
+      List<Alternative> currentItems = await _getLocalAlternatives();
 
+      if (!mounted) return;
+
+      // 2. If logged in, get cloud items and merge
+      final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
-        // Load from Firestore with timeout
         try {
           final cloudItems = await context
               .read<FirestoreService>()
               .getUserAlternatives(currentUser.uid)
               .timeout(const Duration(seconds: 5));
-              
+
           if (cloudItems.isNotEmpty) {
-            if (mounted) {
-              setState(() {
-                _alternatives = cloudItems;
-                _isLoading = false;
-              });
+            // Merge: Cloud items override local items with same URL, others are added.
+            // Using a Map to deduplicate by URL.
+            final Map<String, Alternative> mergedMap = {};
+            
+            // Add local first
+            for (var item in currentItems) {
+              if (item.url.isNotEmpty) {
+                mergedMap[item.url] = item;
+              }
             }
-            // Cache to local storage
-            _saveToLocal(cloudItems);
-            return;
+
+            // Add/Overwrite with cloud
+            for (var item in cloudItems) {
+              if (item.url.isNotEmpty) {
+                mergedMap[item.url] = item;
+              }
+            }
+            
+            currentItems = mergedMap.values.toList();
+            
+            // Update local cache with the merged result so it persists offline
+            await _saveToLocal(currentItems);
           }
         } catch (e) {
           print("Firestore load failed (or timed out): $e");
-          // Continue to local load
+          // Continue with just local items
         }
       }
 
-      // Fallback to local storage or defaults
-      await _loadLocal();
+      if (mounted) {
+        setState(() {
+          _alternatives = currentItems;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       print("Critical error in _loadData: $e");
-      // Even if everything fails, stop loading
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
   }
 
-  Future<void> _loadLocal() async {
+  Future<List<Alternative>> _getLocalAlternatives() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final String? localData = prefs.getString('localItems');
@@ -81,15 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
           final decoded = jsonDecode(localData);
           if (decoded is List && decoded.isNotEmpty) {
              final items = decoded.map((e) => Alternative()..mergeFromJsonMap(e)).toList();
-             if (items.isNotEmpty) {
-               if (mounted) {
-                 setState(() {
-                   _alternatives = items;
-                   _isLoading = false;
-                 });
-               }
-               return;
-             }
+             if (items.isNotEmpty) return items;
           }
         } catch (e) {
           print("Error parsing local cached data: $e");
@@ -104,26 +115,13 @@ class _HomeScreenState extends State<HomeScreen> {
         final items = decoded.map((e) {
           return Alternative()..mergeFromProto3Json(e);
         }).toList();
-
-        if (items.isNotEmpty) {
-          if (mounted) {
-            setState(() {
-              _alternatives = items;
-              _isLoading = false;
-            });
-          }
-          return;
-        }
+        if (items.isNotEmpty) return items;
       }
     } catch (e) {
       print("Error loading local/assets: $e");
     }
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    return [];
   }
 
   Future<void> _saveToLocal(List<Alternative> items) async {
@@ -161,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 setState(() {
                   _alternatives = []; // Clear data to force reload defaults
                 });
-                _loadLocal();
+                _loadData();
               },
             )
           else
