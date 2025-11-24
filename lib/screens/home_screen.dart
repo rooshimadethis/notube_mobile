@@ -28,75 +28,145 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
 
-    // Check current user
-    final currentUser = FirebaseAuth.instance.currentUser;
+    try {
+      // Check current user
+      final currentUser = FirebaseAuth.instance.currentUser;
 
-    if (currentUser != null) {
-      // Load from Firestore
-      final cloudItems = await context.read<FirestoreService>().getUserAlternatives(currentUser.uid);
-      if (cloudItems.isNotEmpty) {
-        setState(() {
-          _alternatives = cloudItems;
-          _isLoading = false;
-        });
-        // Cache to local storage
-        _saveToLocal(cloudItems);
-        return;
+      if (currentUser != null) {
+        // Load from Firestore with timeout
+        try {
+          final cloudItems = await context
+              .read<FirestoreService>()
+              .getUserAlternatives(currentUser.uid)
+              .timeout(const Duration(seconds: 5));
+              
+          if (cloudItems.isNotEmpty) {
+            if (mounted) {
+              setState(() {
+                _alternatives = cloudItems;
+                _isLoading = false;
+              });
+            }
+            // Cache to local storage
+            _saveToLocal(cloudItems);
+            return;
+          }
+        } catch (e) {
+          print("Firestore load failed (or timed out): $e");
+          // Continue to local load
+        }
+      }
+
+      // Fallback to local storage or defaults
+      await _loadLocal();
+    } catch (e) {
+      print("Critical error in _loadData: $e");
+      // Even if everything fails, stop loading
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
-
-    // Fallback to local storage or defaults
-    _loadLocal();
   }
 
   Future<void> _loadLocal() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? localData = prefs.getString('localItems');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? localData = prefs.getString('localItems');
 
-    if (localData != null) {
-      final List<dynamic> decoded = jsonDecode(localData);
-      setState(() {
-        _alternatives = decoded.map((e) => Alternative()..mergeFromJsonMap(e)).toList();
-        _isLoading = false;
-      });
-    } else {
-      // Load defaults (hardcoded for now as we can't easily read assets without setup)
-      // In a real app, we'd load from assets/alternatives.json
+      if (localData != null) {
+        try {
+          final decoded = jsonDecode(localData);
+          if (decoded is List && decoded.isNotEmpty) {
+             final items = decoded.map((e) => Alternative()..mergeFromJsonMap(e)).toList();
+             if (items.isNotEmpty) {
+               if (mounted) {
+                 setState(() {
+                   _alternatives = items;
+                   _isLoading = false;
+                 });
+               }
+               return;
+             }
+          }
+        } catch (e) {
+          print("Error parsing local cached data: $e");
+        }
+      }
+
       // Load defaults from package assets
-      try {
-        final String jsonString = await rootBundle.loadString('packages/notube_shared/assets/default_alternatives.json');
-        final List<dynamic> decoded = jsonDecode(jsonString);
+      final String jsonString = await rootBundle.loadString(
+          'packages/notube_shared/assets/default_alternatives.json');
+      final decoded = jsonDecode(jsonString);
+      if (decoded is List && decoded.isNotEmpty) {
+          final items = decoded.map((e) => Alternative()..mergeFromJsonMap(e)).toList();
+          if (items.isNotEmpty) {
+            if (mounted) {
+              setState(() {
+                _alternatives = items;
+                _isLoading = false;
+              });
+            }
+            return;
+          }
+      }
+    } catch (e) {
+      print("Error loading local/assets: $e");
+      // Fall through to hardcoded defaults
+    }
+
+    // Fallback to hardcoded defaults if asset load fails
+    try {
+      final List<Alternative> hardcodedDefaults = [
+        Alternative()
+          ..title = 'Unsplash'
+          ..description = 'Beautiful, free images and photos.'
+          ..url = 'https://unsplash.com'
+          ..category = 'photography',
+        Alternative()
+          ..title = 'Audible'
+          ..description = 'Listen to audiobooks and podcasts.'
+          ..url = 'https://www.audible.com'
+          ..category = 'books',
+        Alternative()
+          ..title = 'GitHub'
+          ..description = 'Where the world builds software.'
+          ..url = 'https://github.com'
+          ..category = 'software',
+      ];
+
+      if (mounted) {
         setState(() {
-          _alternatives = decoded.map((e) => Alternative()..mergeFromJsonMap(e)).toList();
+          _alternatives = hardcodedDefaults;
           _isLoading = false;
         });
-      } catch (e) {
-        print("Error loading default alternatives: $e");
+      }
+    } catch (e) {
+      print("Critical error setting hardcoded defaults: $e");
+      if (mounted) {
         setState(() {
-          _alternatives = [];
           _isLoading = false;
+          // _alternatives remains empty, triggering the empty state UI
         });
       }
     }
   }
 
   Future<void> _saveToLocal(List<Alternative> items) async {
-    final prefs = await SharedPreferences.getInstance();
-    final String encoded = jsonEncode(items.map((e) => e.writeToJsonMap()).toList());
-    await prefs.setString('localItems', encoded);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String encoded = jsonEncode(items.map((e) => e.writeToJsonMap()).toList());
+      await prefs.setString('localItems', encoded);
+    } catch (e) {
+      print("Error saving to local: $e");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final user = context.watch<User?>();
-
-    // Reload data if user logs in/out
-    // Note: This is a simple way to trigger reload. In a production app, use a more robust state management.
-    if (user != null && _alternatives.isEmpty && !_isLoading) {
-       _loadData();
-    }
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A), // Slate 900
@@ -135,16 +205,33 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              child: ListView.builder(
-                padding: const EdgeInsets.only(bottom: 20),
-                itemCount: _alternatives.length,
-                itemBuilder: (context, index) {
-                  return AlternativeCard(alternative: _alternatives[index]);
-                },
-              ),
-            ),
+          : _alternatives.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'No alternatives found.',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadData,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadData,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    itemCount: _alternatives.length,
+                    itemBuilder: (context, index) {
+                      return AlternativeCard(alternative: _alternatives[index]);
+                    },
+                  ),
+                ),
     );
   }
 }
