@@ -3,7 +3,14 @@ import 'package:notube_shared/alternative.pb.dart';
 import '../services/groq_service.dart';
 
 class AddAlternativeDialog extends StatefulWidget {
-  const AddAlternativeDialog({super.key});
+  final String? initialUrl;
+  final String? initialTitle;
+
+  const AddAlternativeDialog({
+    super.key,
+    this.initialUrl,
+    this.initialTitle,
+  });
 
   @override
   State<AddAlternativeDialog> createState() => _AddAlternativeDialogState();
@@ -16,6 +23,17 @@ class _AddAlternativeDialogState extends State<AddAlternativeDialog> {
   String _category = 'custom';
   bool _isGenerating = false;
   final _groqService = GroqService();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialUrl != null) {
+      _urlController.text = widget.initialUrl!;
+    }
+    if (widget.initialTitle != null) {
+      _titleController.text = widget.initialTitle!;
+    }
+  }
 
   @override
   void dispose() {

@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:flutter/services.dart';
+import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:notube_shared/alternative.pb.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
@@ -25,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   Timer? _debounceTimer;
   StreamSubscription? _authSubscription;
+  StreamSubscription? _intentDataStreamSubscription;
 
   @override
   void initState() {
@@ -34,11 +36,29 @@ class _HomeScreenState extends State<HomeScreen> {
     _authSubscription = context.read<AuthService>().user.listen((_) {
       _loadData();
     });
+    
+    // Listen for shared text (URLs)
+    _intentDataStreamSubscription = ReceiveSharingIntent.instance.getMediaStream().listen((List<SharedMediaFile> value) {
+      if (mounted && value.isNotEmpty) {
+        // For text/url shares, the content is often in the path
+        _handleSharedText(value.first.path);
+      }
+    }, onError: (err) {
+      developer.log("getLinkStream error: $err");
+    });
+
+    // Handle initial shared text
+    ReceiveSharingIntent.instance.getInitialMedia().then((List<SharedMediaFile> value) {
+      if (value.isNotEmpty && mounted) {
+        _handleSharedText(value.first.path);
+      }
+    });
   }
 
   @override
   void dispose() {
     _authSubscription?.cancel();
+    _intentDataStreamSubscription?.cancel();
     _debounceTimer?.cancel();
     super.dispose();
   }
@@ -309,10 +329,32 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _showAddDialog() async {
+  void _handleSharedText(String text) {
+    developer.log("Shared text received: $text");
+    String url = text;
+    String title = '';
+    
+    // Attempt to extract URL if mixed with text
+    final urlRegExp = RegExp(r'https?://\S+');
+    final match = urlRegExp.firstMatch(text);
+    if (match != null) {
+      url = match.group(0)!;
+      // Use remaining text as title, cleaning up common separators
+      title = text.replaceAll(url, '').trim();
+      if (title.endsWith('-')) title = title.substring(0, title.length - 1).trim();
+      if (title.endsWith('|')) title = title.substring(0, title.length - 1).trim();
+    }
+    
+    _showAddDialog(initialUrl: url, initialTitle: title.isNotEmpty ? title : null);
+  }
+
+  Future<void> _showAddDialog({String? initialUrl, String? initialTitle}) async {
     final result = await showDialog<Alternative>(
       context: context,
-      builder: (context) => const AddAlternativeDialog(),
+      builder: (context) => AddAlternativeDialog(
+        initialUrl: initialUrl,
+        initialTitle: initialTitle,
+      ),
     );
 
     if (result != null && mounted) {
