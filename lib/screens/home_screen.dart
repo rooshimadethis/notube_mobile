@@ -98,9 +98,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _saveToLocal(newItems);
   }
 
-  // Unused but kept for reference if editing is added back
-  // void _updateAlternatives(List<Alternative> newItems) { ... }
-
   Future<List<Alternative>> _getLocalAlternatives() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -155,6 +152,61 @@ class _HomeScreenState extends State<HomeScreen> {
       grouped[category]!.add(alt);
     }
     return grouped;
+  }
+
+  Future<void> _confirmDelete(Alternative alt) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text('Delete Alternative?', style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Are you sure you want to delete "${alt.title}"?',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      if (!mounted) return;
+
+      // Remove from local state
+      setState(() {
+        _alternatives.removeWhere((a) => a == alt);
+      });
+
+      // Update local storage
+      await _saveToLocal(_alternatives);
+
+      // Update cloud if logged in
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && mounted) {
+        try {
+          await context.read<FirestoreService>().removeAlternative(user.uid, alt);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Removed from cloud')),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error removing from cloud: $e')),
+            );
+          }
+        }
+      }
+    }
   }
 
   @override
@@ -237,7 +289,10 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                           ),
-                          ...items.map((alt) => AlternativeCard(alternative: alt)),
+                          ...items.map((alt) => AlternativeCard(
+                                alternative: alt,
+                                onLongPress: () => _confirmDelete(alt),
+                              )),
                         ],
                       );
                     }).toList(),

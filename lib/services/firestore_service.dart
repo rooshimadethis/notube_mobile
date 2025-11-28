@@ -71,4 +71,16 @@ class FirestoreService {
 
     return mergedMap.values.toList();
   }
+
+  Future<void> removeAlternative(String userId, Alternative alternative) async {
+    try {
+      await _db.collection('users').doc(userId).update({
+        'alternatives': FieldValue.arrayRemove([alternative.writeToJsonMap()])
+      });
+      developer.log("Removed alternative from Firestore for user $userId");
+    } catch (e) {
+      developer.log("Error removing alternative: $e");
+      rethrow;
+    }
+  }
 }

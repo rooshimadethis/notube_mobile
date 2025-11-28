@@ -4,8 +4,13 @@ import 'package:notube_shared/alternative.pb.dart';
 
 class AlternativeCard extends StatelessWidget {
   final Alternative alternative;
+  final VoidCallback? onLongPress;
 
-  const AlternativeCard({super.key, required this.alternative});
+  const AlternativeCard({
+    super.key,
+    required this.alternative,
+    this.onLongPress,
+  });
 
   Future<void> _launchUrl() async {
     final Uri url = Uri.parse(alternative.url);
@@ -23,6 +28,7 @@ class AlternativeCard extends StatelessWidget {
       color: Colors.white.withValues(alpha: 0.1),
       child: InkWell(
         onTap: _launchUrl,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
