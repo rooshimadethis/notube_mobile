@@ -98,8 +98,12 @@ class _HomeScreenState extends State<HomeScreen> {
     FirestoreService firestoreService,
     String userId,
   ) async {
-    // If lists are identical, no need to ask
-    // (Simple check: length and titles/urls match? For now, just ask as requested)
+    // If lists are identical, no need to ask - just ensure local is synced
+    if (_areAlternativesEqual(local, cloud)) {
+      developer.log("Local and cloud are already in sync, no dialog needed");
+      _setAlternativesFromLoad(cloud); // Ensure local storage is updated
+      return;
+    }
     
     await showDialog(
       context: context,
@@ -191,6 +195,17 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       developer.log("Error saving to local: $e");
     }
+  }
+
+  /// Compares two lists of alternatives to check if they're identical
+  bool _areAlternativesEqual(List<Alternative> list1, List<Alternative> list2) {
+    if (list1.length != list2.length) return false;
+    
+    // Create sets of identifiers (URL or title) for comparison
+    final set1 = list1.map((a) => a.url.isNotEmpty ? a.url : a.title).toSet();
+    final set2 = list2.map((a) => a.url.isNotEmpty ? a.url : a.title).toSet();
+    
+    return set1.length == set2.length && set1.containsAll(set2);
   }
 
   Map<String, List<Alternative>> _groupAlternatives(List<Alternative> alternatives) {
