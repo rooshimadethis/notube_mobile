@@ -41,7 +41,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _intentDataStreamSubscription = ReceiveSharingIntent.instance.getMediaStream().listen((List<SharedMediaFile> value) {
       if (mounted && value.isNotEmpty) {
         // For text/url shares, the content is often in the path
-        _handleSharedText(value.first.path);
+        final item = value.first;
+        _handleSharedText(item.path, item.message);
       }
     }, onError: (err) {
       developer.log("getLinkStream error: $err");
@@ -50,7 +51,8 @@ class _HomeScreenState extends State<HomeScreen> {
     // Handle initial shared text
     ReceiveSharingIntent.instance.getInitialMedia().then((List<SharedMediaFile> value) {
       if (value.isNotEmpty && mounted) {
-        _handleSharedText(value.first.path);
+        final item = value.first;
+        _handleSharedText(item.path, item.message);
       }
     });
   }
@@ -329,20 +331,24 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _handleSharedText(String text) {
-    developer.log("Shared text received: $text");
+  void _handleSharedText(String text, [String? subject]) {
+    developer.log("Shared text received: $text, subject: $subject");
     String url = text;
-    String title = '';
+    String title = subject ?? '';
     
     // Attempt to extract URL if mixed with text
     final urlRegExp = RegExp(r'https?://\S+');
     final match = urlRegExp.firstMatch(text);
     if (match != null) {
       url = match.group(0)!;
-      // Use remaining text as title, cleaning up common separators
-      title = text.replaceAll(url, '').trim();
-      if (title.endsWith('-')) title = title.substring(0, title.length - 1).trim();
-      if (title.endsWith('|')) title = title.substring(0, title.length - 1).trim();
+      
+      // If we didn't get a specific subject, try to parse one from the text
+      if (title.isEmpty) {
+        // Use remaining text as title, cleaning up common separators
+        title = text.replaceAll(url, '').trim();
+        if (title.endsWith('-')) title = title.substring(0, title.length - 1).trim();
+        if (title.endsWith('|')) title = title.substring(0, title.length - 1).trim();
+      }
     }
     
     _showAddDialog(initialUrl: url, initialTitle: title.isNotEmpty ? title : null);

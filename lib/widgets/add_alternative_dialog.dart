@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:notube_shared/alternative.pb.dart';
+import 'package:http/http.dart' as http;
 import '../services/groq_service.dart';
 
 class AddAlternativeDialog extends StatefulWidget {
@@ -23,6 +24,7 @@ class _AddAlternativeDialogState extends State<AddAlternativeDialog> {
   String _category = 'custom';
   bool _isGenerating = false;
   final _groqService = GroqService();
+  bool _isFetchingTitle = false;
 
   @override
   void initState() {
@@ -30,8 +32,48 @@ class _AddAlternativeDialogState extends State<AddAlternativeDialog> {
     if (widget.initialUrl != null) {
       _urlController.text = widget.initialUrl!;
     }
-    if (widget.initialTitle != null) {
+    if (widget.initialTitle != null && widget.initialTitle!.isNotEmpty) {
       _titleController.text = widget.initialTitle!;
+    } else if (widget.initialUrl != null && widget.initialUrl!.isNotEmpty) {
+      _fetchTitle();
+    }
+  }
+
+  Future<void> _fetchTitle() async {
+    if (!mounted) return;
+    setState(() => _isFetchingTitle = true);
+    
+    try {
+      // Basic header to look like a browser (helps with some sites)
+      final response = await http.get(
+        Uri.parse(widget.initialUrl!),
+        headers: {'User-Agent': 'Mozilla/5.0'},
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        // Simple regex to find <title> tag
+        final match = RegExp(r'<title>(.*?)</title>', caseSensitive: false, dotAll: true)
+            .firstMatch(response.body);
+        
+        if (match != null && match.group(1) != null) {
+          final title = match.group(1)!.trim()
+              .replaceAll(RegExp(r'&amp;'), '&')
+              .replaceAll(RegExp(r'&lt;'), '<')
+              .replaceAll(RegExp(r'&gt;'), '>')
+              .replaceAll(RegExp(r'&quot;'), '"')
+              .replaceAll(RegExp(r'&#39;'), "'");
+
+          if (mounted && _titleController.text.isEmpty) {
+            setState(() {
+              _titleController.text = title;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      // Silently fail if title fetch fails
+    } finally {
+      if (mounted) setState(() => _isFetchingTitle = false);
     }
   }
 
@@ -92,11 +134,21 @@ class _AddAlternativeDialogState extends State<AddAlternativeDialog> {
               TextFormField(
                 controller: _titleController,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Site Name',
-                  labelStyle: TextStyle(color: Colors.grey),
-                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
-                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.indigoAccent)),
+                  labelStyle: const TextStyle(color: Colors.grey),
+                  enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
+                  focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.indigoAccent)),
+                  suffixIcon: _isFetchingTitle 
+                      ? const SizedBox(
+                          width: 16, 
+                          height: 16, 
+                          child: Padding(
+                            padding: EdgeInsets.all(12.0),
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.indigoAccent),
+                          ),
+                        )
+                      : null,
                 ),
                 validator: (value) => value == null || value.isEmpty ? 'Please enter a name' : null,
               ),
