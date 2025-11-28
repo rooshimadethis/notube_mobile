@@ -163,11 +163,24 @@ class _HomeScreenState extends State<HomeScreen> {
           final decoded = jsonDecode(localData);
           if (decoded is List && decoded.isNotEmpty) {
              final items = decoded.map((e) => Alternative()..mergeFromProto3Json(e)).toList();
-             if (items.isNotEmpty) return items;
+             if (items.isNotEmpty) {
+               developer.log("Loaded ${items.length} items from local storage");
+               return items;
+             }
           }
         } catch (e) {
           developer.log("Error parsing local cached data: $e");
+          // Clear corrupted local storage
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove('localItems');
+            developer.log("Cleared corrupted local storage");
+          } catch (clearError) {
+            developer.log("Error clearing local storage: $clearError");
+          }
         }
+      } else {
+        developer.log("No local data found, will load defaults");
       }
 
       // Load defaults from package assets
@@ -190,11 +203,23 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _saveToLocal(List<Alternative> items) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final String encoded = jsonEncode(items.map((e) => e.writeToJsonMap()).toList());
+      // Use custom map conversion to ensure field names (not proto tags)
+      final String encoded = jsonEncode(items.map(_alternativeToMap).toList());
       await prefs.setString('localItems', encoded);
+      developer.log("Saved ${items.length} items to local storage");
     } catch (e) {
       developer.log("Error saving to local: $e");
     }
+  }
+
+  /// Convert Alternative to Map with explicit field names
+  Map<String, dynamic> _alternativeToMap(Alternative a) {
+    return {
+      'title': a.title,
+      'url': a.url,
+      'description': a.description,
+      'category': a.category,
+    };
   }
 
   /// Compares two lists of alternatives to check if they're identical
@@ -246,10 +271,19 @@ class _HomeScreenState extends State<HomeScreen> {
     if (confirmed == true) {
       if (!mounted) return;
 
-      // Remove from local state
+      // Remove from local state - compare by URL/title, not object equality
+      final beforeCount = _alternatives.length;
       setState(() {
-        _alternatives.removeWhere((a) => a == alt);
+        _alternatives.removeWhere((a) {
+          // Compare by URL if both have it, otherwise by title
+          if (alt.url.isNotEmpty && a.url.isNotEmpty) {
+            return a.url == alt.url;
+          }
+          return a.title == alt.title;
+        });
       });
+      final afterCount = _alternatives.length;
+      developer.log("Deleted item: before=$beforeCount, after=$afterCount, removed=${beforeCount - afterCount}");
 
       // Update local storage
       await _saveToLocal(_alternatives);
