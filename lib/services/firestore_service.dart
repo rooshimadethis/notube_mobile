@@ -22,14 +22,14 @@ class FirestoreService {
       return [];
     } catch (e) {
       developer.log("Error fetching alternatives: $e");
-      return [];
+      rethrow;
     }
   }
 
   Future<void> saveUserAlternatives(
       String userId, List<Alternative> alternatives) async {
     try {
-      final altsData = alternatives.map((a) => a.writeToJsonMap()).toList();
+      final altsData = alternatives.map(_alternativeToMap).toList();
       
       await _db.collection('users').doc(userId).set({
         'alternatives': altsData,
@@ -75,7 +75,7 @@ class FirestoreService {
   Future<void> removeAlternative(String userId, Alternative alternative) async {
     try {
       await _db.collection('users').doc(userId).update({
-        'alternatives': FieldValue.arrayRemove([alternative.writeToJsonMap()])
+        'alternatives': FieldValue.arrayRemove([_alternativeToMap(alternative)])
       });
       developer.log("Removed alternative from Firestore for user $userId");
     } catch (e) {
@@ -87,7 +87,7 @@ class FirestoreService {
   Future<void> addAlternative(String userId, Alternative alternative) async {
     try {
       await _db.collection('users').doc(userId).set({
-        'alternatives': FieldValue.arrayUnion([alternative.writeToJsonMap()]),
+        'alternatives': FieldValue.arrayUnion([_alternativeToMap(alternative)]),
         'lastUpdated': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
       developer.log("Added alternative to Firestore for user $userId");
@@ -95,5 +95,14 @@ class FirestoreService {
       developer.log("Error adding alternative: $e");
       rethrow;
     }
+  }
+
+  Map<String, dynamic> _alternativeToMap(Alternative a) {
+    return {
+      'title': a.title,
+      'url': a.url,
+      'description': a.description,
+      'category': a.category,
+    };
   }
 }

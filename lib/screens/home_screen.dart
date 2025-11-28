@@ -55,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _alternatives = currentItems);
       }
 
-      // 2. If logged in, get cloud items and merge
+      // 2. If logged in, handle sync logic
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null && mounted) {
         try {
@@ -65,17 +65,22 @@ class _HomeScreenState extends State<HomeScreen> {
               .timeout(const Duration(seconds: 5));
 
           if (mounted) {
-            // Use the service's merge logic (Cloud wins)
-            final mergedItems = firestoreService.mergeAlternatives(currentItems, cloudItems);
-            
-            // Update state and save to local, but DON'T save to cloud yet
-            // (we just loaded from cloud, no need to save back)
-            _setAlternativesFromLoad(mergedItems);
+            if (cloudItems.isEmpty) {
+              // Case 3: No info in database -> Push local to cloud
+              await firestoreService.saveUserAlternatives(currentUser.uid, currentItems);
+              developer.log("Pushed local items to empty cloud");
+            } else {
+              // Case 2a: User has info -> Show dialog
+              await _showSyncDialog(currentItems, cloudItems, firestoreService, currentUser.uid);
+            }
           }
         } catch (e) {
           developer.log("Firestore load failed (or timed out): $e");
-          // Don't set _hasLoadedFromCloud = true on error
-          // This prevents local data from overwriting cloud data
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Failed to sync with cloud. Using local data.')),
+            );
+          }
         }
       }
       
@@ -85,6 +90,51 @@ class _HomeScreenState extends State<HomeScreen> {
       developer.log("Critical error in _loadData: $e");
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _showSyncDialog(
+    List<Alternative> local,
+    List<Alternative> cloud,
+    FirestoreService firestoreService,
+    String userId,
+  ) async {
+    // If lists are identical, no need to ask
+    // (Simple check: length and titles/urls match? For now, just ask as requested)
+    
+    await showDialog(
+      context: context,
+      barrierDismissible: false, // Force choice
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text('Sync Conflict', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'Cloud data found. How would you like to proceed?',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              // Overwrite Local: Use cloud items
+              _setAlternativesFromLoad(cloud);
+            },
+            child: const Text('Use cloud data', style: TextStyle(color: Colors.redAccent)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              // Merge: Cloud wins conflicts, new local items added
+              final merged = firestoreService.mergeAlternatives(local, cloud);
+              _setAlternativesFromLoad(merged);
+              // Save merged back to cloud
+              await firestoreService.saveUserAlternatives(userId, merged);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.indigoAccent),
+            child: const Text('Merge cloud and local data', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Sets alternatives from initial load without triggering cloud save
