@@ -10,6 +10,7 @@ import 'package:notube_shared/alternative.pb.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../widgets/alternative_card.dart';
+import '../widgets/add_alternative_dialog.dart';
 import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -209,6 +210,42 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _showAddDialog() async {
+    final result = await showDialog<Alternative>(
+      context: context,
+      builder: (context) => const AddAlternativeDialog(),
+    );
+
+    if (result != null && mounted) {
+      // Add to local state
+      setState(() {
+        _alternatives.insert(0, result);
+      });
+
+      // Update local storage
+      await _saveToLocal(_alternatives);
+
+      // Update cloud if logged in
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && mounted) {
+        try {
+          await context.read<FirestoreService>().addAlternative(user.uid, result);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Added to cloud')),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error adding to cloud: $e')),
+            );
+          }
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<User?>();
@@ -298,6 +335,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     }).toList(),
                   ),
                 ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddDialog,
+        backgroundColor: Colors.indigoAccent,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
     );
   }
 }

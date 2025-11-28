@@ -83,4 +83,17 @@ class FirestoreService {
       rethrow;
     }
   }
+
+  Future<void> addAlternative(String userId, Alternative alternative) async {
+    try {
+      await _db.collection('users').doc(userId).set({
+        'alternatives': FieldValue.arrayUnion([alternative.writeToJsonMap()]),
+        'lastUpdated': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      developer.log("Added alternative to Firestore for user $userId");
+    } catch (e) {
+      developer.log("Error adding alternative: $e");
+      rethrow;
+    }
+  }
 }
