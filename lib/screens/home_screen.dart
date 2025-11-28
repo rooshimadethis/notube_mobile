@@ -30,7 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadData();
-    // Listen to auth changes to reload data automatically
+    // Listen to auth changes. If user logs in, this triggers _loadData which handles the sync flow.
     _authSubscription = context.read<AuthService>().user.listen((_) {
       _loadData();
     });
@@ -55,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _alternatives = currentItems);
       }
 
-      // 2. If logged in, handle sync logic
+      // 2. If logged in, initiate sync flow (Push local if cloud empty, or prompt user)
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null && mounted) {
         try {
@@ -66,11 +66,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
           if (mounted) {
             if (cloudItems.isEmpty) {
-              // Case 3: No info in database -> Push local to cloud
+              // Case 3: Cloud is empty -> Push local items to cloud automatically
               await firestoreService.saveUserAlternatives(currentUser.uid, currentItems);
               developer.log("Pushed local items to empty cloud");
             } else {
-              // Case 2a: User has info -> Show dialog
+              // Case 2a: Cloud has data -> Prompt user to Overwrite Local or Merge
               await _showSyncDialog(currentItems, cloudItems, firestoreService, currentUser.uid);
             }
           }
@@ -145,7 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _alternatives = newItems;
     });
     
-    // Save to local storage only
+    // Save to local storage (Source of truth for offline/not logged in)
     _saveToLocal(newItems);
   }
 

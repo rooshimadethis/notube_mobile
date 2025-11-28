@@ -29,6 +29,7 @@ class FirestoreService {
   Future<void> saveUserAlternatives(
       String userId, List<Alternative> alternatives) async {
     try {
+      // Convert to Map explicitly to ensure field names are strings (not proto tags)
       final altsData = alternatives.map(_alternativeToMap).toList();
       
       await _db.collection('users').doc(userId).set({
@@ -42,7 +43,9 @@ class FirestoreService {
   }
 
   /// Merges local and cloud alternatives.
-  /// Cloud items take precedence. Local items are added only if they are new.
+  /// Used when the user chooses to "Merge" in the sync dialog.
+  /// Cloud items take precedence for conflicts (same URL/Title).
+  /// Local items are added only if they are not present in the cloud list.
   List<Alternative> mergeAlternatives(
       List<Alternative> local, List<Alternative> cloud) {
     final Map<String, Alternative> mergedMap = {};
