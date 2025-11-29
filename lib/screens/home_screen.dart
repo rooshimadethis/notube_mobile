@@ -259,6 +259,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'url': a.url,
       'description': a.description,
       'category': a.category,
+      'bypassPaywall': a.bypassPaywall,
     };
   }
 

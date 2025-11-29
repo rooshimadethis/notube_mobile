@@ -22,6 +22,7 @@ class _AddAlternativeDialogState extends State<AddAlternativeDialog> {
   final _urlController = TextEditingController();
   final _titleController = TextEditingController();
   String _category = 'custom';
+  bool _bypassPaywall = false;
   bool _isGenerating = false;
   final _groqService = GroqService();
   bool _isFetchingTitle = false;
@@ -101,7 +102,8 @@ class _AddAlternativeDialogState extends State<AddAlternativeDialog> {
           ..title = title
           ..url = processedUrl
           ..description = description
-          ..category = _category;
+          ..category = _category
+          ..bypassPaywall = _bypassPaywall;
 
         if (mounted) {
           Navigator.pop(context, alternative);
@@ -184,6 +186,19 @@ class _AddAlternativeDialogState extends State<AddAlternativeDialog> {
                   DropdownMenuItem(value: 'education', child: Text('Education')),
                 ],
                 onChanged: (value) => setState(() => _category = value!),
+              ),
+              const SizedBox(height: 16),
+              CheckboxListTile(
+                title: const Text('Paywalled?', style: TextStyle(color: Colors.white)),
+                value: _bypassPaywall,
+                onChanged: (bool? value) {
+                  setState(() {
+                    _bypassPaywall = value ?? false;
+                  });
+                },
+                activeColor: Colors.indigoAccent,
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
               ),
             ],
           ),

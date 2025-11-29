@@ -106,6 +106,7 @@ class FirestoreService {
       'url': a.url,
       'description': a.description,
       'category': a.category,
+      'bypassPaywall': a.bypassPaywall,
     };
   }
 }
