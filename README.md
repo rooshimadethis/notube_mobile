@@ -1,9 +1,7 @@
 # NoTube Mobile
 
 TODO:
- - [ ] Add a "share" option to this app which adds it to the list of alternatives
- - [ ] 
- - [ ] The proto/firebase interaction looks weird
+ - [ ] Move groq api to cloudflare worker
 
 A new Flutter project.
 
