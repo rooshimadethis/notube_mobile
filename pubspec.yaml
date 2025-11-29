@@ -48,6 +48,7 @@ dependencies:
   http: ^1.6.0
   receive_sharing_intent: ^1.8.1
   flutter_displaymode: ^0.7.0
+  webview_flutter: ^4.13.0
 
 dev_dependencies:
   flutter_test:

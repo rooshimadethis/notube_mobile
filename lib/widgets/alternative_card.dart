@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:notube_shared/alternative.pb.dart';
 
+import '../screens/webview_screen.dart';
+
 class AlternativeCard extends StatelessWidget {
   final Alternative alternative;
   final VoidCallback? onLongPress;
@@ -12,10 +14,22 @@ class AlternativeCard extends StatelessWidget {
     this.onLongPress,
   });
 
-  Future<void> _launchUrl() async {
-    final Uri url = Uri.parse(alternative.url);
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      throw Exception('Could not launch $url');
+  Future<void> _launchUrl(BuildContext context) async {
+    if (alternative.bypassPaywall) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => WebViewScreen(
+            url: alternative.url,
+            title: alternative.title,
+          ),
+          fullscreenDialog: true,
+        ),
+      );
+    } else {
+      final Uri url = Uri.parse(alternative.url);
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        throw Exception('Could not launch $url');
+      }
     }
   }
 
@@ -27,7 +41,7 @@ class AlternativeCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       color: Colors.white.withValues(alpha: 0.1),
       child: InkWell(
-        onTap: _launchUrl,
+        onTap: () => _launchUrl(context),
         onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
