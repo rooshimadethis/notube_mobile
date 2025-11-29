@@ -86,14 +86,24 @@ class _HomeScreenState extends State<HomeScreen> {
               .getUserAlternatives(currentUser.uid)
               .timeout(const Duration(seconds: 5));
 
+          final prefs = await SharedPreferences.getInstance();
+          final lastSyncedUserId = prefs.getString('lastSyncedUserId');
+          final isFirstSync = lastSyncedUserId != currentUser.uid;
+
           if (mounted) {
             if (cloudItems.isEmpty) {
-              // Case 3: Cloud is empty -> Push local items to cloud automatically
+              // Case 1: Cloud is empty -> Push local items to cloud automatically
               await firestoreService.saveUserAlternatives(currentUser.uid, currentItems);
+              await prefs.setString('lastSyncedUserId', currentUser.uid);
               developer.log("Pushed local items to empty cloud");
-            } else {
-              // Case 2a: Cloud has data -> Prompt user to Overwrite Local or Merge
+            } else if (isFirstSync && !_areAlternativesEqual(currentItems, cloudItems)) {
+              // Case 2: First time sync with conflict -> Show Dialog
               await _showSyncDialog(currentItems, cloudItems, firestoreService, currentUser.uid);
+            } else {
+              // Case 3: Subsequent sync or identical -> Use cloud
+              developer.log("Auto-syncing from cloud (isFirstSync: $isFirstSync)");
+              _setAlternativesFromLoad(cloudItems);
+              await prefs.setString('lastSyncedUserId', currentUser.uid);
             }
           }
         } catch (e) {
@@ -114,6 +124,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+
+
   Future<void> _showSyncDialog(
     List<Alternative> local,
     List<Alternative> cloud,
@@ -124,6 +136,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_areAlternativesEqual(local, cloud)) {
       developer.log("Local and cloud are already in sync, no dialog needed");
       _setAlternativesFromLoad(cloud); // Ensure local storage is updated
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('lastSyncedUserId', userId);
       return;
     }
     
@@ -143,6 +157,8 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.pop(context);
               // Overwrite Local: Use cloud items
               _setAlternativesFromLoad(cloud);
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('lastSyncedUserId', userId);
             },
             child: const Text('Use cloud data', style: TextStyle(color: Colors.redAccent)),
           ),
@@ -154,6 +170,8 @@ class _HomeScreenState extends State<HomeScreen> {
               _setAlternativesFromLoad(merged);
               // Save merged back to cloud
               await firestoreService.saveUserAlternatives(userId, merged);
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('lastSyncedUserId', userId);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.indigoAccent),
             child: const Text('Merge cloud and local data', style: TextStyle(color: Colors.white)),
