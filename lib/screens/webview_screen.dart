@@ -18,6 +18,7 @@ class WebViewScreen extends StatefulWidget {
 
 class _WebViewScreenState extends State<WebViewScreen> {
   late final WebViewController _controller;
+  late final TextEditingController _urlController;
   bool _isLoading = true;
 
   @override
@@ -25,6 +26,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
     super.initState();
     final initialUri = Uri.parse(widget.url);
     final initialHost = initialUri.host;
+    _urlController = TextEditingController(text: widget.url);
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -33,7 +35,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
         NavigationDelegate(
           onPageStarted: (String url) {
             if (mounted) {
-              setState(() => _isLoading = true);
+              setState(() {
+                _isLoading = true;
+                _urlController.text = url;
+              });
             }
           },
           onPageFinished: (String url) {
@@ -52,7 +57,14 @@ class _WebViewScreenState extends State<WebViewScreen> {
       ..loadRequest(initialUri);
   }
 
+  @override
+  void dispose() {
+    _urlController.dispose();
+    super.dispose();
+  }
+
   NavigationDecision _handleNavigation(String url, String initialHost) {
+    // ... existing logic ...
     final uri = Uri.parse(url);
     final host = uri.host;
 
@@ -125,9 +137,36 @@ class _WebViewScreenState extends State<WebViewScreen> {
         backgroundColor: const Color(0xFF0F172A),
         appBar: AppBar(
           backgroundColor: const Color(0xFF0F172A),
-          title: Text(
-            widget.title,
+          title: TextField(
+            controller: _urlController,
             style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.1),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(20),
+                borderSide: BorderSide.none,
+              ),
+              hintText: 'Search or enter URL',
+              hintStyle: TextStyle(color: Colors.grey[400]),
+            ),
+            keyboardType: TextInputType.url,
+            textInputAction: TextInputAction.go,
+            onSubmitted: (value) {
+              String url = value.trim();
+              if (url.isEmpty) return;
+
+              if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                if (url.contains('.') && !url.contains(' ')) {
+                   url = 'https://$url';
+                } else {
+                   // Treat as search query
+                   url = 'https://www.google.com/search?q=${Uri.encodeComponent(url)}';
+                }
+              }
+              _controller.loadRequest(Uri.parse(url));
+            },
           ),
           leading: IconButton(
             icon: const Icon(Icons.close, color: Colors.white),
