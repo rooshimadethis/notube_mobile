@@ -273,17 +273,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return set1.length == set2.length && set1.containsAll(set2);
   }
 
-  Map<String, List<Alternative>> _groupAlternatives(List<Alternative> alternatives) {
-    final grouped = <String, List<Alternative>>{};
-    for (var alt in alternatives) {
-      final category = alt.category.isEmpty ? 'Others' : alt.category;
-      if (!grouped.containsKey(category)) {
-        grouped[category] = [];
-      }
-      grouped[category]!.add(alt);
-    }
-    return grouped;
-  }
 
   Future<void> _confirmDelete(Alternative alt) async {
     final confirmed = await showDialog<bool>(
@@ -472,32 +461,13 @@ class _HomeScreenState extends State<HomeScreen> {
               : RefreshIndicator(
                   onRefresh: _loadData,
                   child: ListView(
-                    padding: const EdgeInsets.only(bottom: 20),
-                    children: _groupAlternatives(_alternatives).entries.map((entry) {
-                      final category = entry.key;
-                      final items = entry.value;
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-                            child: Text(
-                              category.toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                          ),
-                          ...items.map((alt) => AlternativeCard(
-                                alternative: alt,
-                                onLongPress: () => _confirmDelete(alt),
-                              )),
-                        ],
-                      );
-                    }).toList(),
+                    padding: const EdgeInsets.only(bottom: 20, top: 16),
+                    children: (List<Alternative>.from(_alternatives)..shuffle())
+                        .map((alt) => AlternativeCard(
+                              alternative: alt,
+                              onLongPress: () => _confirmDelete(alt),
+                            ))
+                        .toList(),
                   ),
                 ),
       floatingActionButton: FloatingActionButton(
