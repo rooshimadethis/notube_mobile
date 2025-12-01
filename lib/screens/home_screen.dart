@@ -13,6 +13,8 @@ import '../services/firestore_service.dart';
 import '../widgets/alternative_card.dart';
 import '../widgets/add_alternative_dialog.dart';
 import 'login_screen.dart';
+import 'gratitude_journal_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -55,6 +57,23 @@ class _HomeScreenState extends State<HomeScreen> {
         _handleSharedText(item.path, item.message);
       }
     });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkGratitudeJournal();
+    });
+  }
+
+  Future<void> _checkGratitudeJournal() async {
+    final prefs = await SharedPreferences.getInstance();
+    final show = prefs.getBool('showGratitudeJournal') ?? true;
+    if (show && mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const GratitudeJournalScreen(),
+          fullscreenDialog: true,
+        ),
+      );
+    }
   }
 
   @override
@@ -387,13 +406,13 @@ class _HomeScreenState extends State<HomeScreen> {
           await context.read<FirestoreService>().addAlternative(user.uid, result);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Added to cloud')),
+              const SnackBar(content: Text('Saved')),
             );
           }
         } catch (e) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error adding to cloud: $e')),
+              SnackBar(content: Text('Error saving to cloud: $e')),
             );
           }
         }
@@ -418,6 +437,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings, color: Colors.white),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+          ),
           if (user != null)
             IconButton(
               icon: const Icon(Icons.logout, color: Colors.white),
