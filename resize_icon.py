@@ -11,6 +11,13 @@ def add_padding(input_path, output_path, scale_factor=0.65):
     # Resize the image
     resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
     
+    # Recolor to white
+    r, g, b, a = resized_img.split()
+    # Create a white image of the same size
+    white_img = Image.new("RGB", resized_img.size, (255, 255, 255))
+    # Paste the white image using the alpha channel of the resized image as mask
+    resized_img = Image.merge("RGBA", (white_img.split()[0], white_img.split()[1], white_img.split()[2], a))
+    
     # Create a new transparent image with the original dimensions
     new_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     

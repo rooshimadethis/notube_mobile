@@ -8,6 +8,7 @@
 - **AI‑generated descriptions** for custom sites via a Cloudflare worker (Groq API).
 - **Robust sync logic** using Firestore transactions to avoid race conditions.
 - **Shared library (`notube_shared`)** provides common models and default alternatives.
+- **Gratitude Journal**: A simple, toggleable journal screen on app launch to encourage positive reflection.
 
 ## 🛠️ Implementation Highlights
 
