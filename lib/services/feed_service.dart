@@ -47,6 +47,13 @@ class FeedService {
   static const String _disabledFeedsKey = 'disabled_feed_urls';
   static const String _explicitlyEnabledFeedsKey = 'explicitly_enabled_feed_urls';
 
+  // Cache for feed items: URL -> Cache Entry
+  final Map<String, _FeedCacheEntry> _cache = {};
+
+  // Smart TTL: Check for updates after 1 hour.
+  // Since we use Conditional GETs (ETag), checks are cheap!
+  static const Duration _cacheTtl = Duration(hours: 1);
+
   Future<List<FeedSource>> loadFeedSources() async {
     final List<FeedSource> sources = [];
     try {
@@ -119,15 +126,48 @@ class FeedService {
     return sources;
   }
 
-  Future<List<FeedItem>> fetchFeeds(List<FeedSource> sources) async {
-    // Limit concurrency or just fire all? For now fire all.
-    // In production might want to limit to batch of 10-20.
-    final futures = sources.map((source) => _fetchFeed(source));
-    final results = await Future.wait(futures);
-    
-    // Flatten
-    var allItems = results.expand((i) => i).toList();
+  Future<List<FeedItem>> fetchFeeds(List<FeedSource> sources, {bool forceRefresh = false}) async {
+    // 1. Remove deselected feeds from cache
+    final sourceUrls = sources.map((s) => s.url).toSet();
+    _cache.removeWhere((url, _) => !sourceUrls.contains(url));
 
+    // 2. Identify which sources need fetching
+    final List<Future<void>> fetchFutures = [];
+
+    for (var source in sources) {
+      final cachedEntry = _cache[source.url];
+      
+      // Check if cache is valid (exists AND not expired)
+      bool isCacheValid = false;
+      if (cachedEntry != null) {
+        final age = DateTime.now().difference(cachedEntry.timestamp);
+        if (age < _cacheTtl) {
+          isCacheValid = true;
+        } else {
+          developer.log("Cache expired for ${source.title} (Age: ${age.inHours}h)");
+        }
+      }
+
+      // Fetch if forced refresh OR cache invalid (missing or expired)
+      if (forceRefresh || !isCacheValid) {
+        fetchFutures.add(_fetchAndUpdateCache(source));
+      }
+    }
+
+    // 3. Wait for all fetches to complete
+    if (fetchFutures.isNotEmpty) {
+      await Future.wait(fetchFutures);
+    }
+    
+    // 4. Aggregate all items from cache
+    final allItems = <FeedItem>[];
+    for (var source in sources) {
+      if (_cache.containsKey(source.url)) {
+        allItems.addAll(_cache[source.url]!.items);
+      }
+    }
+
+    // 5. Sort
     allItems.sort((a, b) {
       if (a.publishedDate == null && b.publishedDate == null) return 0;
       if (a.publishedDate == null) return 1;
@@ -135,76 +175,83 @@ class FeedService {
       return b.publishedDate!.compareTo(a.publishedDate!); // Newest first
     });
     
-    // AI Model filtering disabled due to native library issues
-    // The keyword + sentiment_dart filtering in _parseAndFilterFeed is sufficient
     return allItems;
-    
-    /* AI Model code - disabled for now
-    // Filter out items using AI model (sequentially for now as Interpreter is not thread safe essentially)
-    // Actually, TFLite Interpreter IS thread-safe but loading it inside compute is hard. 
-    // We run on main thread.
-    
-    // Initialize AI if needed
-    if (!_aiInitialized) {
-      await _aiService.initialize();
-      _aiInitialized = true;
-    }
-
-    final filteredItems = <FeedItem>[];
-    for (var item in allItems) {
-       // Combine title and description
-       final text = "${item.title}. ${item.description}";
-       
-       // Check AI Score (if model is ready)
-       // We can optimize: If keyword filter (in compute) already removed stuff, we are good.
-       // But we want to filter MORE.
-       
-       final score = await _aiService.analyzeSentiment(text);
-       // Assuming model returns "Positive Confidence". 
-       // If < 0.2 it is likely negative? Or if using simple binary, < 0.5?
-       // Let's assume prediction[1] is positive probability.
-       // If prob of positive is very low (< 0.1), it's very negative?
-       // Default fallback is 0.5 (Neutral).
-       
-       // Threshold: Filter if Positive Confidence < 0.3 (Meaning highly negative)
-       if (score < 0.3) {
-         developer.log('🤖 AI FILTERED: "${item.title}" (PosProb: $score)');
-         continue; 
-       }
-       
-       filteredItems.add(item);
-    }
-    
-    return filteredItems;
-    */
   }
 
-  Future<List<FeedItem>> _fetchFeed(FeedSource source) async {
+  Future<void> _fetchAndUpdateCache(FeedSource source) async {
+    final cached = _cache[source.url];
+    
+    // Perform Conditional GET
+    final result = await _fetchFeed(
+      source, 
+      etag: cached?.etag, 
+      lastModified: cached?.lastModified,
+    );
+
+    if (result.status == _FetchStatus.notModified) {
+      // 304: Server says our cache is still good. Just update timestamp.
+      developer.log("✅ 304 Not Modified: ${source.title}");
+      if (cached != null) {
+        _cache[source.url] = _FeedCacheEntry(
+          items: cached.items, // Keep old items
+          timestamp: DateTime.now(),
+          etag: cached.etag, // Keep old headers
+          lastModified: cached.lastModified,
+        );
+      }
+    } else if (result.status == _FetchStatus.success) {
+      // 200: New content!
+      developer.log("⬇️ Fetched New Content: ${source.title} (${result.items.length} items)");
+      if (result.items.isNotEmpty) {
+        _cache[source.url] = _FeedCacheEntry(
+          items: result.items,
+          timestamp: DateTime.now(),
+          etag: result.etag,
+          lastModified: result.lastModified,
+        );
+      }
+    }
+  }
+
+  Future<_FetchResult> _fetchFeed(FeedSource source, {String? etag, String? lastModified}) async {
     try {
+      final headers = <String, String>{
+        'User-Agent':
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Upgrade-Insecure-Requests': '1',
+      };
+
+      if (etag != null) headers['If-None-Match'] = etag;
+      if (lastModified != null) headers['If-Modified-Since'] = lastModified;
+
       final response = await _client.get(
         Uri.parse(source.url),
-        headers: {
-          'User-Agent':
-              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Upgrade-Insecure-Requests': '1',
-        },
+        headers: headers,
       ).timeout(const Duration(seconds: 10));
       
-      if (response.statusCode == 200) {
-        return await compute(_parseAndFilterFeed, {
+      if (response.statusCode == 304) {
+        return _FetchResult.notModified();
+      } else if (response.statusCode == 200) {
+        final items = await compute(_parseAndFilterFeed, {
           'xml': response.body, 
           'url': source.url,
           'category': source.category,
         });
+
+        return _FetchResult.success(
+          items: items, 
+          etag: response.headers['etag'], 
+          lastModified: response.headers['last-modified'],
+        );
       } else {
         developer.log("Failed to fetch feed ${source.url}: ${response.statusCode}");
       }
     } catch (e) {
       developer.log("Error fetching feed ${source.url}: $e");
     }
-    return [];
+    return _FetchResult.error();
   }
 
 }
@@ -496,4 +543,39 @@ String _cleanText(String text) {
   // Simple HTML tag removal if needed, or decoding entities
   // For now return as is or minimal cleanup
   return text.replaceAll(RegExp(r'<[^>]*>'), '').trim();
+}
+
+class _FeedCacheEntry {
+  final List<FeedItem> items;
+  final DateTime timestamp; // When we last successfully checked (200 or 304)
+  final String? etag;
+  final String? lastModified;
+
+  _FeedCacheEntry({
+    required this.items, 
+    required this.timestamp,
+    this.etag,
+    this.lastModified,
+  });
+}
+
+enum _FetchStatus { success, notModified, error }
+
+class _FetchResult {
+  final _FetchStatus status;
+  final List<FeedItem> items;
+  final String? etag;
+  final String? lastModified;
+
+  _FetchResult.success({
+    required this.items, 
+    this.etag, 
+    this.lastModified
+  }) : status = _FetchStatus.success;
+
+  _FetchResult.notModified() 
+      : status = _FetchStatus.notModified, items = [], etag = null, lastModified = null;
+
+  _FetchResult.error() 
+      : status = _FetchStatus.error, items = [], etag = null, lastModified = null;
 }

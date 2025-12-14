@@ -25,13 +25,14 @@ class _FeedScreenState extends State<FeedScreen> {
     _loadFeeds();
   }
 
-  Future<void> _loadFeeds() async {
+  Future<void> _loadFeeds({bool forceRefresh = false}) async {
     if (!mounted) return;
     setState(() => _isLoading = true);
 
     try {
       final sources = await _feedService.getEnabledFeedSources();
-      final items = await _feedService.fetchFeeds(sources);
+      // Pass forceRefresh to service
+      final items = await _feedService.fetchFeeds(sources, forceRefresh: forceRefresh);
       
       if (mounted) {
         setState(() {
@@ -87,7 +88,7 @@ class _FeedScreenState extends State<FeedScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: _loadFeeds,
+              onRefresh: () => _loadFeeds(forceRefresh: true),
               child: _items.isEmpty
                   ? Center(
                       child: SingleChildScrollView(
@@ -109,9 +110,23 @@ class _FeedScreenState extends State<FeedScreen> {
                       ),
                     )
                   : ListView.builder(
-                      itemCount: _items.length,
+                      itemCount: _items.length + 1,
                       itemBuilder: (context, index) {
-                        return _buildFeedItem(_items[index]);
+                        if (index == 0) {
+                          return Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                            child: Text(
+                              '${_items.length} ARTICLES AVAILABLE',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.6),
+                                fontSize: 13,
+                                letterSpacing: 1.2,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          );
+                        }
+                        return _buildFeedItem(_items[index - 1]);
                       },
                     ),
             ),
