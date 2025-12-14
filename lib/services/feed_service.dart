@@ -45,6 +45,7 @@ class FeedService {
   // But for now we just load every time or rely on caller to manage state
   
   static const String _disabledFeedsKey = 'disabled_feed_urls';
+  static const String _explicitlyEnabledFeedsKey = 'explicitly_enabled_feed_urls';
 
   Future<List<FeedSource>> loadFeedSources() async {
     final List<FeedSource> sources = [];
@@ -68,12 +69,24 @@ class FeedService {
     await prefs.setStringList(_disabledFeedsKey, disabledUrls.toList());
   }
 
+  Future<Set<String>> getExplicitlyEnabledUrls() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_explicitlyEnabledFeedsKey)?.toSet() ?? {};
+  }
+
+  Future<void> setExplicitlyEnabledUrls(Set<String> enabledUrls) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_explicitlyEnabledFeedsKey, enabledUrls.toList());
+  }
+
   // Helper to get only enabled URLs
   Future<List<FeedSource>> getEnabledFeedSources() async {
     final allSources = await loadFeedSources();
     final disabled = await getDisabledUrls();
+    final enabledOverrides = await getExplicitlyEnabledUrls();
+    
     return allSources
-        .where((s) => s.enabled && !disabled.contains(s.url))
+        .where((s) => (s.enabled || enabledOverrides.contains(s.url)) && !disabled.contains(s.url))
         .toList();
   }
 

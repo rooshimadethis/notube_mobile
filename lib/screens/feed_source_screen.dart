@@ -13,6 +13,7 @@ class _FeedSourceScreenState extends State<FeedSourceScreen> {
   
   List<FeedSource> _allSources = [];
   Set<String> _disabledUrls = {};
+  Set<String> _enabledOverrides = {};
   bool _isLoading = true;
 
   @override
@@ -26,11 +27,13 @@ class _FeedSourceScreenState extends State<FeedSourceScreen> {
     try {
       final sources = await _feedService.loadFeedSources();
       final disabled = await _feedService.getDisabledUrls();
+      final enabledOverrides = await _feedService.getExplicitlyEnabledUrls();
       
       if (mounted) {
         setState(() {
           _allSources = sources;
           _disabledUrls = disabled;
+          _enabledOverrides = enabledOverrides;
           _isLoading = false;
         });
       }
@@ -44,19 +47,26 @@ class _FeedSourceScreenState extends State<FeedSourceScreen> {
     }
   }
 
-  Future<void> _toggleSource(String url, bool? enabled) async {
-    if (enabled == null) return;
+  Future<void> _toggleSource(String url, bool? isChecked) async {
+    if (isChecked == null) return;
     
     setState(() {
-      if (enabled) {
+      if (isChecked) {
         _disabledUrls.remove(url);
+        // If default is disabled, we must explicitly enable it
+        // Find the source definition to check default 'enabled' state
+        final source = _allSources.firstWhere((s) => s.url == url, orElse: () => const FeedSource(title: '', url: '', category: '', enabled: true));
+        if (!source.enabled) {
+          _enabledOverrides.add(url);
+        }
       } else {
         _disabledUrls.add(url);
+        _enabledOverrides.remove(url);
       }
     });
     
-    // Save immediately or wait? Saving immediately is safer.
     await _feedService.setDisabledUrls(_disabledUrls);
+    await _feedService.setExplicitlyEnabledUrls(_enabledOverrides);
   }
 
   @override
@@ -84,7 +94,7 @@ class _FeedSourceScreenState extends State<FeedSourceScreen> {
               itemCount: _allSources.length,
               itemBuilder: (context, index) {
                 final source = _allSources[index];
-                final isEnabled = !_disabledUrls.contains(source.url);
+                final isEnabled = (source.enabled || _enabledOverrides.contains(source.url)) && !_disabledUrls.contains(source.url);
 
                 return CheckboxListTile(
                   title: Text(
