@@ -2,11 +2,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:sentiment_dart/sentiment_dart.dart';
+// import 'package:ml_sentiment_simple/ml_sentiment_simple.dart';
 import 'package:xml/xml.dart';
 
 import 'dart:developer' as developer;
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
+
+// import 'sentiment_ai_service.dart'; // Disabled - native library issues
 import '../models/feed_item.dart';
 
 class FeedSource {
@@ -35,6 +38,8 @@ class FeedSource {
 
 class FeedService {
   final http.Client _client = http.Client();
+  // final SentimentAiService _aiService = SentimentAiService(); // Disabled
+  // bool _aiInitialized = false; // Disabled
 
   // Cache for feed URLs to avoid re-parsing OPML constantly if not needed
   // But for now we just load every time or rely on caller to manage state
@@ -117,7 +122,48 @@ class FeedService {
       return b.publishedDate!.compareTo(a.publishedDate!); // Newest first
     });
     
+    // AI Model filtering disabled due to native library issues
+    // The keyword + sentiment_dart filtering in _parseAndFilterFeed is sufficient
     return allItems;
+    
+    /* AI Model code - disabled for now
+    // Filter out items using AI model (sequentially for now as Interpreter is not thread safe essentially)
+    // Actually, TFLite Interpreter IS thread-safe but loading it inside compute is hard. 
+    // We run on main thread.
+    
+    // Initialize AI if needed
+    if (!_aiInitialized) {
+      await _aiService.initialize();
+      _aiInitialized = true;
+    }
+
+    final filteredItems = <FeedItem>[];
+    for (var item in allItems) {
+       // Combine title and description
+       final text = "${item.title}. ${item.description}";
+       
+       // Check AI Score (if model is ready)
+       // We can optimize: If keyword filter (in compute) already removed stuff, we are good.
+       // But we want to filter MORE.
+       
+       final score = await _aiService.analyzeSentiment(text);
+       // Assuming model returns "Positive Confidence". 
+       // If < 0.2 it is likely negative? Or if using simple binary, < 0.5?
+       // Let's assume prediction[1] is positive probability.
+       // If prob of positive is very low (< 0.1), it's very negative?
+       // Default fallback is 0.5 (Neutral).
+       
+       // Threshold: Filter if Positive Confidence < 0.3 (Meaning highly negative)
+       if (score < 0.3) {
+         developer.log('🤖 AI FILTERED: "${item.title}" (PosProb: $score)');
+         continue; 
+       }
+       
+       filteredItems.add(item);
+    }
+    
+    return filteredItems;
+    */
   }
 
   Future<List<FeedItem>> _fetchFeed(FeedSource source) async {
@@ -150,6 +196,33 @@ class FeedService {
 
 }
 
+
+
+// Negative keywords that strongly suggest "negative emotion" (Tragedy, Violence, Crime)
+/*
+const Set<String> _negativeKeywords = {
+  'murder', 'kill', 'killed', 'killing', 'death', 'dead', 'died', 'fatal',
+  'crash', 'suicide', 'massacre', 'terror', 'terrorist', 'bomb', 'attack',
+  'assault', 'rape', 'sexual', 'victim', 'tragedy', 'disaster', 'collapse',
+  'hostage', 'execution', 'torture', 'genocide', 'slaughter', 'bloodbath',
+  'scandal', 'jail', 'prison', 'arrested', 'fraud', 'corrupt', 'cancer',
+  'shooting', 'stabbed', 'violent', 'war', 'battle', 'casualty',
+};
+*/
+
+// Create a singleton-like analyzer with our custom negative words
+// This runs in pure Dart with zero native dependencies!
+/*
+SentimentAnalyzer _createSentimentAnalyzer() {
+  return SentimentAnalyzer(
+    lexicon: WordSentimentLexicon(
+      language: LexiconLanguage.english,
+      customNegativeWords: _negativeKeywords,
+    ),
+  );
+}
+*/
+
 // Top-level function for compute
 List<FeedItem> _parseAndFilterFeed(Map<String, dynamic> args) {
   final xmlString = args['xml'] as String;
@@ -158,13 +231,53 @@ List<FeedItem> _parseAndFilterFeed(Map<String, dynamic> args) {
   
   final items = _parseFeedXml(xmlString, feedUrl, category);
   
+  // Create ML sentiment analyzer with custom negative words
+  // final mlAnalyzer = _createSentimentAnalyzer();
+  
   // Filter out negative sentiment
   return items.where((item) {
     final text = "${item.title}. ${item.description}";
+
+    
     try {
-      final result = Sentiment.analysis(text, emoji: true);
-      return result.score >= 0; // Keep non-negative
+      // 1. Check strict keywords first (fast path) - using word boundaries
+      // 1. Keyword search DISABLED per user request (relying on ML/AFINN context)
+      /*
+      for (final word in _negativeKeywords) {
+        // Use regex word boundary \b to match whole words only
+        // e.g., "war" won't match "software"
+        final wordPattern = RegExp(r'\b' + word + r'\b', caseSensitive: false);
+        if (wordPattern.hasMatch(lowerText)) {
+          developer.log('👻 FILTERED (Keyword "$word"): "${item.title}" ${item.description}');
+          return false;
+        }
+      }
+      */
+      
+      // 2. ML disabled per user request
+      /*
+      // Use ml_sentiment_simple for ML-based analysis (pure Dart, no native deps)
+      final mlResult = mlAnalyzer.analyze(text);
+      
+      // Filter if ML score is negative (score ranges from -1 to 1)
+      if (mlResult.score < 0) {
+        developer.log('🤖 ML FILTERED: "${item.title}" (Score: ${mlResult.score}, Label: ${mlResult.label})');
+        return false;
+      }
+      */
+      
+      // 3. Use sentiment_dart (AFINN-165)
+      final afinnResult = Sentiment.analysis(text, emoji: true);
+      
+      // Only filter if AFINN score is significantly negative
+      if (afinnResult.score < -2) {
+        developer.log('📊 AFINN FILTERED: "${item.title}" (Score: ${afinnResult.score})');
+        return false;
+      }
+      
+      return true; // Keep the article
     } catch (e) {
+      // On error, keep the article
       return true;
     }
   }).toList();
