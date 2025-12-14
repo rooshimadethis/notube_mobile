@@ -20,6 +20,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   late final WebViewController _controller;
   late final TextEditingController _urlController;
   bool _isLoading = true;
+  bool _bypassArchiveCheck = false;
 
   @override
   void initState() {
@@ -64,6 +65,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   NavigationDecision _handleNavigation(String url, String initialHost) {
+    if (_bypassArchiveCheck) {
+      _bypassArchiveCheck = false;
+      return NavigationDecision.navigate;
+    }
+
     // ... existing logic ...
     final uri = Uri.parse(url);
     final host = uri.host;
@@ -117,6 +123,48 @@ class _WebViewScreenState extends State<WebViewScreen> {
     Future.microtask(() => _controller.loadRequest(Uri.parse(archiveUrl)));
     
     return NavigationDecision.prevent;
+  }
+
+  Future<void> _toggleArchive() async {
+    final currentUrl = await _controller.currentUrl();
+    if (currentUrl == null) return;
+
+    final uri = Uri.parse(currentUrl);
+    final host = uri.host;
+
+    final isArchive = host.contains('archive.ph') ||
+        host.contains('archive.is') ||
+        host.contains('archive.today') ||
+        host.contains('archive.li') ||
+        host.contains('archive.vn') ||
+        host.contains('archive.fo') ||
+        host.contains('archive.md');
+
+    if (isArchive) {
+      final regExp = RegExp(r'^https?:\/\/[^\/]+\/(.+)$');
+      final match = regExp.firstMatch(currentUrl);
+      if (match != null) {
+        String target = match.group(1)!;
+        final httpIndex = target.indexOf('http');
+        if (httpIndex != -1) {
+          target = target.substring(httpIndex);
+        }
+        _bypassArchiveCheck = true;
+        if (mounted) {
+          _controller.loadRequest(Uri.parse(target));
+        }
+      }
+    } else {
+      final cleanUri = uri.replace(queryParameters: {});
+      String cleanUrl = cleanUri.toString();
+      if (cleanUrl.endsWith('?')) {
+        cleanUrl = cleanUrl.substring(0, cleanUrl.length - 1);
+      }
+      final archiveUrl = 'https://archive.ph/$cleanUrl';
+      if (mounted) {
+        _controller.loadRequest(Uri.parse(archiveUrl));
+      }
+    }
   }
 
   @override
@@ -187,6 +235,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
                       debugPrint('Could not launch $uri: $e');
                     }
                   }
+                } else if (value == 'toggle_archive') {
+                  await _toggleArchive();
                 }
               },
               itemBuilder: (context) => [
@@ -194,6 +244,13 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   value: 'open_external',
                   child: Text(
                     'Open in external browser',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'toggle_archive',
+                  child: Text(
+                    'Toggle archive link',
                     style: TextStyle(color: Colors.white),
                   ),
                 ),

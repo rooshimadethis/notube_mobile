@@ -96,6 +96,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (shouldShow && mounted) {
       await prefs.setInt('lastGratitudeShownTime', now.millisecondsSinceEpoch);
       
+      if (!mounted) return;
+
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => const GratitudeJournalScreen(),

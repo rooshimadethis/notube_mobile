@@ -92,7 +92,7 @@ class _FeedSourceScreenState extends State<FeedSourceScreen> {
                     style: const TextStyle(color: Colors.white),
                   ),
                   subtitle: Text(
-                    source.url,
+                    "${source.category} • ${source.url}",
                     style: TextStyle(color: Colors.grey[400], fontSize: 12),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

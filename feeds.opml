@@ -1,145 +1,109 @@
-<?xml version='1.0' encoding='UTF-8'?>
+<?xml version="1.0" ?>
 <opml version="1.0">
 	<head>
 		<title>Fluent Reader Export</title>
 	</head>
 	<body>
-		<outline text="Learning" title="Learning">
-			<outline text="The Decision Lab" title="The Decision Lab" enabled="false" type="rss" xmlUrl="https://thedecisionlab.com/feed/" />
-			<outline text="Ness Labs" title="Ness Labs" enabled="false" type="rss" xmlUrl="https://nesslabs.com/feed" />
-			<outline text="Farnam Street" title="Farnam Street" enabled="true" type="rss" xmlUrl="https://fs.blog/feed/" />
-			<outline text="The Sunday Wisdom" title="The Sunday Wisdom" enabled="false" type="rss" xmlUrl="https://coffeeandjunk.substack.com/feed" />
-			<outline text="Commonplace - The Commoncog Blog" title="Commonplace - The Commoncog Blog" enabled="false" type="rss" xmlUrl="https://commoncog.com/blog/rss/" />
-			<outline text="Scott H Young" title="Scott H Young" enabled="true" type="rss" xmlUrl="https://feeds.feedburner.com/scotthyoung/HAHx" />
-			<outline text="Big Think" title="Big Think" enabled="true" type="rss" xmlUrl="https://feeds.feedburner.com/bigthink/main" />
-		</outline>
-		<outline text="Startup" title="Startup">
-			<outline text="Steve Blank" title="Steve Blank" enabled="false" type="rss" xmlUrl="http://steveblank.com/feed/" />
-			<outline text="The singularity is nearer" title="The singularity is nearer" enabled="false" type="rss" xmlUrl="https://geohot.github.io/blog/feed.xml" />
-			<outline text="Hacker News" title="Hacker News" enabled="true" type="rss" xmlUrl="http://news.ycombinator.com/rss" />
-			<outline text="Guy Kawasaki" title="Guy Kawasaki" enabled="false" type="rss" xmlUrl="http://guykawasaki.com/feed/" />
-			<outline text="Essays - Benedict Evans" title="Essays - Benedict Evans" enabled="true" type="rss" xmlUrl="http://ben-evans.com/benedictevans?format=rss" />
-			<outline text="Sam Altman" title="Sam Altman" enabled="true" type="rss" xmlUrl="http://blog.samaltman.com/posts.atom" />
-			<outline text="Andrew Chen" title="Andrew Chen" enabled="true" type="rss" xmlUrl="http://andrewchen.co/feed/" />
-
-			<outline text="Both Sides of the Table" title="Both Sides of the Table" enabled="false" type="rss" xmlUrl="http://feeds.feedburner.com/BothSidesOfTheTable" />
-			<outline text="The Black Box of Product Management - Medium" title="The Black Box of Product Management - Medium" enabled="false" type="rss" xmlUrl="https://medium.com/feed/the-black-box-of-product-management" />
-			<outline text="Product Life" title="Product Life" enabled="false" type="rss" xmlUrl="https://productlife.to/feed" />
-			<outline text="Irrational Exuberance" title="Irrational Exuberance" enabled="false" type="rss" xmlUrl="https://lethain.com/feeds/" />
-		</outline>
-		<outline text="Tech News" title="Tech News">
-			<outline text="VentureBeat" title="VentureBeat" enabled="true" type="rss" xmlUrl="http://venturebeat.com/feed/" />
-			<outline text="The Verge" title="The Verge" enabled="true" type="rss" xmlUrl="http://www.theverge.com/rss/full.xml" />
-			<outline text="Engadget" title="Engadget" enabled="false" type="rss" xmlUrl="http://www.engadget.com/rss-full.xml" />
-			<outline text="Tech in Asia" title="Tech in Asia" enabled="false" type="rss" xmlUrl="https://feeds2.feedburner.com/PennOlson" />
-			<outline text="TechCrunch" title="TechCrunch" enabled="true" type="rss" xmlUrl="https://techcrunch.com/feed/" />
-			<outline text="Fast Company" title="Fast Company" enabled="false" type="rss" xmlUrl="http://feeds.feedburner.com/fastcompany/headlines" />
-			</outline>
-		<outline text="Products &amp; Ideas" title="Products &amp; Ideas">
-			<outline text="Product Hunt — The best new products, every day" title="Product Hunt — The best new products, every day" enabled="true" type="rss" xmlUrl="http://www.producthunt.com/feed" />
-			<outline text="Hacker News: Show HN" title="Hacker News: Show HN" enabled="false" type="rss" xmlUrl="http://hnrss.org/show" />
-			<outline text="Hacker News: Launches" title="Hacker News: Launches" enabled="false" type="rss" xmlUrl="https://hnrss.org/launches" />
-			<outline text="Sachin Rekhi's Blog" title="Sachin Rekhi's Blog" enabled="false" type="rss" xmlUrl="http://feeds.feedburner.com/sachinrekhiblog" />
-		</outline>
-		<outline text="Engineering blogs" title="Engineering blogs">
-			<outline text="The Airtable Engineering Blog" title="The Airtable Engineering Blog" enabled="false" type="rss" xmlUrl="https://medium.com/feed/airtable-eng" />
-			<outline text="Medium Engineering - Medium" title="Medium Engineering - Medium" enabled="false" type="rss" xmlUrl="https://medium.com/feed/medium-eng" />
-			<outline text="The PayPal Technology Blog - Medium" title="The PayPal Technology Blog - Medium" enabled="false" type="rss" xmlUrl="https://medium.com/feed/paypal-engineering" />
-			<outline text="Pinterest Engineering Blog - Medium" title="Pinterest Engineering Blog - Medium" enabled="false" type="rss" xmlUrl="https://medium.com/feed/pinterest-engineering" />
-			<outline text="Grab Tech" title="Grab Tech" enabled="false" type="rss" xmlUrl="http://engineering.grab.com/feed.xml" />
-			<outline text="Slack Engineering" title="Slack Engineering" enabled="true" type="rss" xmlUrl="https://slack.engineering/feed" />
-			<outline text="Engineering – The GitHub Blog" title="Engineering – The GitHub Blog" enabled="true" type="rss" xmlUrl="http://githubengineering.com/atom.xml" />
-
-			<outline text="eBay Tech Blog" title="eBay Tech Blog" enabled="false" type="rss" xmlUrl="http://www.ebaytechblog.com/feed/" />
-			<outline text="Spotify Engineering" title="Spotify Engineering" enabled="false" type="rss" xmlUrl="http://labs.spotify.com/feed/" />
-			<outline text="Stripe Blog" title="Stripe Blog" enabled="true" type="rss" xmlUrl="https://stripe.com/blog/feed.rss" />
-
-			<outline text="The Cloudflare Blog" title="The Cloudflare Blog" enabled="true" type="rss" xmlUrl="https://blog.cloudflare.com/rss/" />
-
-			<outline text="Canva Engineering Blog - Medium" title="Canva Engineering Blog - Medium" enabled="false" type="rss" xmlUrl="https://engineering.canva.com/rss" />
-			<outline text="The Airbnb Tech Blog - Medium" title="The Airbnb Tech Blog - Medium" enabled="false" type="rss" xmlUrl="https://medium.com/feed/airbnb-engineering" />
-			<outline text="Dropbox Tech" title="Dropbox Tech" enabled="false" type="rss" xmlUrl="https://dropbox.tech/feed" />
-			<outline text="WePay Engineering Blog" title="WePay Engineering Blog" enabled="false" type="rss" xmlUrl="https://wecode.wepay.com/feed.xml" />
-			<outline text="Web Browser Engineering" title="Web Browser Engineering" enabled="false" type="rss" xmlUrl="https://browser.engineering/rss.xml" />
-			<outline text="Spotify Engineering" title="Spotify Engineering" enabled="true" type="rss" xmlUrl="https://engineering.atspotify.com/feed/" />
-			<outline text="Engineering at Meta" title="Engineering at Meta" enabled="true" type="rss" xmlUrl="https://engineering.fb.com/feed/" />
-
-			<outline text="Julia Evans" title="Julia Evans" enabled="true" type="rss" xmlUrl="https://jvns.ca/atom.xml" />
-			<outline text="Martin Kleppmann's blog" title="Martin Kleppmann's blog" enabled="false" type="rss" xmlUrl="https://feeds.feedburner.com/martinkl?format=xml" />
-			<outline text="Dan Abramov's Overreacted Blog RSS Feed" title="Dan Abramov's Overreacted Blog RSS Feed" enabled="true" type="rss" xmlUrl="https://overreacted.io/rss.xml" />
-			<outline text="Dan Luu" title="Dan Luu" enabled="false" type="rss" xmlUrl="https://danluu.com/atom.xml" />
-			<outline text="Grab Tech" title="Grab Tech" enabled="false" type="rss" xmlUrl="https://engineering.grab.com/feed.xml" />
-			<outline text="Josh Comeau's blog" title="Josh Comeau's blog" enabled="false" type="rss" xmlUrl="https://joshwcomeau.com/rss.xml" />
-			<outline text="Flurries of latent creativity - Stripe CTO blog" title="Flurries of latent creativity - Stripe CTO blog" enabled="false" type="rss" xmlUrl="https://blog.singleton.io/index.xml" />
-			<outline text="Sophie Alpert" title="Sophie Alpert" enabled="false" type="rss" xmlUrl="https://sophiebits.com/atom.xml" />
-			<outline text="Amjad Masad" title="Amjad Masad" enabled="false" type="rss" xmlUrl="https://amasad.me/rss" />
-			<outline text="Signal Blog" title="Signal Blog" enabled="false" type="rss" xmlUrl="https://signal.org/blog/rss.xml" />
-			<outline text="Joel on Software" title="Joel on Software" enabled="false" type="rss" xmlUrl="https://www.joelonsoftware.com/feed/" />
-			<outline text="The Pragmatic Engineer" title="The Pragmatic Engineer" enabled="true" type="rss" xmlUrl="https://blog.pragmaticengineer.com/rss/" />
-		</outline>
-		<outline text="Machine Learning" title="Machine Learning">
-			<outline text="Jay Alammar" title="Jay Alammar" enabled="true" type="rss" xmlUrl="https://jalammar.github.io/feed.xml" />
-			<outline text="Distill" title="Distill" enabled="true" type="rss" xmlUrl="http://distill.pub/rss.xml" />
-			<outline text="Lil’Log" title="Lil’Log" enabled="false" type="rss" xmlUrl="https://lilianweng.github.io/lil-log/feed.xml" />
-			<outline text="MIT News - Artificial intelligence" title="MIT News - Artificial intelligence" enabled="false" type="rss" xmlUrl="http://news.mit.edu/rss/topic/artificial-intelligence2" />
-			<outline text="The Berkeley Artificial Intelligence Research Blog" title="The Berkeley Artificial Intelligence Research Blog" enabled="false" type="rss" xmlUrl="http://bair.berkeley.edu/blog/feed.xml" />
-			<outline text="DeepLearningAI" title="DeepLearningAI" enabled="false" type="rss" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCcIXc5mJsHVYTZR1maL5l9w" />
-			<outline text="Eric Jang" title="Eric Jang" enabled="false" type="rss" xmlUrl="http://blog.evjang.com/feeds/posts/default?alt=rss" />
-			<outline text="The Gradient" title="The Gradient" enabled="false" type="rss" xmlUrl="https://thegradient.pub/rss/" />
-			<outline text="Magenta" title="Magenta" enabled="false" type="rss" xmlUrl="http://magenta.tensorflow.org/feed.xml" />
-
-			<outline text="Google AI Blog" title="Google AI Blog" enabled="true" type="rss" xmlUrl="http://googleresearch.blogspot.com/atom.xml" />
-
-			<outline text="Grammarly Blog" title="Grammarly Blog" enabled="false" type="rss" xmlUrl="https://www.grammarly.com/blog/feed/" />
-			<outline text="Eric Jang" title="Eric Jang" enabled="false" type="rss" xmlUrl="https://evjang.com/feed" />
-			<outline text="Machine Learning" title="Machine Learning" enabled="false" type="rss" xmlUrl="http://www.reddit.com/r/MachineLearning/.rss" />
-			<outline text="Yannic Kilcher" title="Yannic Kilcher" enabled="false" type="rss" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCZHmQk67mSJgfCCTn7xBfew" />
-			<outline text="Two Minute Papers" title="Two Minute Papers" enabled="true" type="rss" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCbfYPyITQ-7l4upoX8nvctg" />
-		</outline>
-		<outline text="Design" title="Design">
-			<outline text="UX Planet" title="UX Planet" enabled="false" type="rss" xmlUrl="https://uxplanet.org/feed" />
-			<outline text="NN/g latest articles and announcements" title="NN/g latest articles and announcements" enabled="false" type="rss" xmlUrl="https://www.nngroup.com/feed/rss/" />
-			<outline text="UX Movement" title="UX Movement" enabled="false" type="rss" xmlUrl="http://feeds.feedburner.com/uxmovement" />
-			<outline text="UXmatters" title="UXmatters" enabled="false" type="rss" xmlUrl="https://uxmatters.com/index.xml" />
-			<outline text="Articles on Smashing Magazine — For Web Designers And Developers" title="Articles on Smashing Magazine — For Web Designers And Developers" enabled="true" type="rss" xmlUrl="https://www.smashingmagazine.com/feed/" />
-			<outline text="UX Collective - Medium" title="UX Collective - Medium" enabled="true" type="rss" xmlUrl="https://uxdesign.cc/feed" />
-			<outline text="web.dev" title="web.dev" enabled="false" type="rss" xmlUrl="https://web.dev/feed.xml" />
-			<outline text="Slack Design" title="Slack Design" enabled="false" type="rss" xmlUrl="https://slack.design/feed/" />
-			<outline text="CSS-Tricks" title="CSS-Tricks" enabled="true" type="rss" xmlUrl="https://feeds.feedburner.com/CssTricks" />
-			<outline text="UX Daily - User Experience Daily" title="UX Daily - User Experience Daily" enabled="false" type="rss" xmlUrl="https://interaction-design.org/rss/site_news.xml" />
-		</outline>
-		<outline text="Psychology" title="Psychology">
-			<outline text="PsyBlog" title="PsyBlog" enabled="true" type="rss" xmlUrl="http://feeds.feedburner.com/PsychologyBlog" />
-			<outline text="Psychology Blog" title="Psychology Blog" enabled="false" type="rss" xmlUrl="http://www.all-about-psychology.com/psychology.xml" />
-			<outline text="Psychology Headlines Around the World" title="Psychology Headlines Around the World" enabled="false" type="rss" xmlUrl="http://www.socialpsychology.org/headlines.rss" />
-			</outline>
-		<outline text="Neuroscience" title="Neuroscience">
-			<outline text="Neuroscience News" title="Neuroscience News" enabled="true" type="rss" xmlUrl="http://neurosciencenews.com/feed/" />
-			<outline text="Neuroscience News -- ScienceDaily" title="Neuroscience News -- ScienceDaily" enabled="false" type="rss" xmlUrl="https://sciencedaily.com/rss/mind_brain/neuroscience.xml" />
-			</outline>
-		<outline text="Science" title="Science">
-			<outline text="Quanta Magazine" title="Quanta Magazine" enabled="true" type="rss" xmlUrl="http://www.quantamagazine.org/feed/" />
-			<outline text="Nature" title="Nature" enabled="true" type="rss" xmlUrl="http://www.nature.com/nature/current_issue/rss" />
-			<outline text="MIT News - Science, Technology, and Society | Technology and society | Program in STS | History of science | History of MIT" title="MIT News - Science, Technology, and Society | Technology and society | Program in STS | History of science | History of MIT" enabled="false" type="rss" xmlUrl="https://news.mit.edu/rss/topic/science-technology-and-society" />
-			<outline text="MIT News" title="MIT News" enabled="false" type="rss" xmlUrl="https://news.mit.edu/rss/research" />
-			<outline text="ScienceAlert" title="ScienceAlert" enabled="false" type="rss" xmlUrl="https://www.sciencealert.com/rss" />
-			<outline text="Singularity Hub" title="Singularity Hub" enabled="false" type="rss" xmlUrl="https://singularityhub.com/feed/" />
-
-		</outline>
-		<outline text="Marketing" title="Marketing">
-			<outline text="Moz" title="Moz" enabled="true" type="rss" xmlUrl="http://feeds.feedburner.com/seomoz" />
-
-
-
-			<outline text="Social Media Examiner | Social Media Marketing" title="Social Media Examiner | Social Media Marketing" enabled="false" type="rss" xmlUrl="http://www.socialmediaexaminer.com/feed/" />
-			<outline text="John Egan" title="John Egan" enabled="false" type="rss" xmlUrl="http://jwegan.com/feed/rss/" />
-			<outline text="Hubspot" title="Hubspot" enabled="false" type="rss" xmlUrl="http://blog.hubspot.com/CMS/UI/Modules/BizBlogger/rss.aspx?tabid=6307&amp;moduleid=8441&amp;maxcount=25" />
-			<outline text="Backlinko" title="Backlinko" enabled="false" type="rss" xmlUrl="http://backlinko.com/feed" />
-		</outline>
-		<outline text="Others" title="Others">
-			<outline text="TED Talks Daily (SD video)" title="TED Talks Daily (SD video)" enabled="true" type="rss" xmlUrl="http://feeds.feedburner.com/tedtalks_video" />
-			<outline text="HBR.org" title="HBR.org" enabled="true" type="rss" xmlUrl="http://feeds.harvardbusiness.org/harvardbusiness/" />
-		</outline>
-
+		<outline text="Hacker News" title="Hacker News" enabled="true" type="rss" xmlUrl="http://news.ycombinator.com/rss" category="Startup"/>
+		<outline text="The Verge" title="The Verge" enabled="true" type="rss" xmlUrl="http://www.theverge.com/rss/full.xml" category="Tech News"/>
+		<outline text="TechCrunch" title="TechCrunch" enabled="true" type="rss" xmlUrl="https://techcrunch.com/feed/" category="Tech News"/>
+		<outline text="Product Hunt — The best new products, every day" title="Product Hunt — The best new products, every day" enabled="true" type="rss" xmlUrl="http://www.producthunt.com/feed" category="Products &amp; Ideas"/>
+		<outline text="The Pragmatic Engineer" title="The Pragmatic Engineer" enabled="true" type="rss" xmlUrl="https://blog.pragmaticengineer.com/rss/" category="Engineering blogs"/>
+		<outline text="Google AI Blog" title="Google AI Blog" enabled="true" type="rss" xmlUrl="http://googleresearch.blogspot.com/atom.xml" category="Machine Learning"/>
+		<outline text="Engineering at Meta" title="Engineering at Meta" enabled="true" type="rss" xmlUrl="https://engineering.fb.com/feed/" category="Engineering blogs"/>
+		<outline text="Stripe Blog" title="Stripe Blog" enabled="true" type="rss" xmlUrl="https://stripe.com/blog/feed.rss" category="Engineering blogs"/>
+		<outline text="Sam Altman" title="Sam Altman" enabled="true" type="rss" xmlUrl="http://blog.samaltman.com/posts.atom" category="Startup"/>
+		<outline text="Essays - Benedict Evans" title="Essays - Benedict Evans" enabled="true" type="rss" xmlUrl="http://ben-evans.com/benedictevans?format=rss" category="Startup"/>
+		<outline text="Engineering – The GitHub Blog" title="Engineering – The GitHub Blog" enabled="true" type="rss" xmlUrl="http://githubengineering.com/atom.xml" category="Engineering blogs"/>
+		<outline text="Slack Engineering" title="Slack Engineering" enabled="true" type="rss" xmlUrl="https://slack.engineering/feed" category="Engineering blogs"/>
+		<outline text="Spotify Engineering" title="Spotify Engineering" enabled="true" type="rss" xmlUrl="https://engineering.atspotify.com/feed/" category="Engineering blogs"/>
+		<outline text="The Cloudflare Blog" title="The Cloudflare Blog" enabled="true" type="rss" xmlUrl="https://blog.cloudflare.com/rss/" category="Engineering blogs"/>
+		<outline text="VentureBeat" title="VentureBeat" enabled="true" type="rss" xmlUrl="http://venturebeat.com/feed/" category="Tech News"/>
+		<outline text="Distill" title="Distill" enabled="true" type="rss" xmlUrl="http://distill.pub/rss.xml" category="Machine Learning"/>
+		<outline text="Jay Alammar" title="Jay Alammar" enabled="true" type="rss" xmlUrl="https://jalammar.github.io/feed.xml" category="Machine Learning"/>
+		<outline text="Two Minute Papers" title="Two Minute Papers" enabled="true" type="rss" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCbfYPyITQ-7l4upoX8nvctg" category="Machine Learning"/>
+		<outline text="Julia Evans" title="Julia Evans" enabled="true" type="rss" xmlUrl="https://jvns.ca/atom.xml" category="Engineering blogs"/>
+		<outline text="Dan Abramov's Overreacted Blog RSS Feed" title="Dan Abramov's Overreacted Blog RSS Feed" enabled="true" type="rss" xmlUrl="https://overreacted.io/rss.xml" category="Engineering blogs"/>
+		<outline text="Farnam Street" title="Farnam Street" enabled="true" type="rss" xmlUrl="https://fs.blog/feed/" category="Learning"/>
+		<outline text="Nature" title="Nature" enabled="true" type="rss" xmlUrl="http://www.nature.com/nature/current_issue/rss" category="Science"/>
+		<outline text="Quanta Magazine" title="Quanta Magazine" enabled="true" type="rss" xmlUrl="http://www.quantamagazine.org/feed/" category="Science"/>
+		<outline text="TED Talks Daily (SD video)" title="TED Talks Daily (SD video)" enabled="true" type="rss" xmlUrl="http://feeds.feedburner.com/tedtalks_video" category="Others"/>
+		<outline text="HBR.org" title="HBR.org" enabled="true" type="rss" xmlUrl="http://feeds.harvardbusiness.org/harvardbusiness/" category="Others"/>
+		<outline text="Articles on Smashing Magazine — For Web Designers And Developers" title="Articles on Smashing Magazine — For Web Designers And Developers" enabled="true" type="rss" xmlUrl="https://www.smashingmagazine.com/feed/" category="Design"/>
+		<outline text="UX Collective - Medium" title="UX Collective - Medium" enabled="true" type="rss" xmlUrl="https://uxdesign.cc/feed" category="Design"/>
+		<outline text="CSS-Tricks" title="CSS-Tricks" enabled="true" type="rss" xmlUrl="https://feeds.feedburner.com/CssTricks" category="Design"/>
+		<outline text="Andrew Chen" title="Andrew Chen" enabled="true" type="rss" xmlUrl="http://andrewchen.co/feed/" category="Startup"/>
+		<outline text="Scott H Young" title="Scott H Young" enabled="true" type="rss" xmlUrl="https://feeds.feedburner.com/scotthyoung/HAHx" category="Learning"/>
+		<outline text="Big Think" title="Big Think" enabled="true" type="rss" xmlUrl="https://feeds.feedburner.com/bigthink/main" category="Learning"/>
+		<outline text="Neuroscience News" title="Neuroscience News" enabled="true" type="rss" xmlUrl="http://neurosciencenews.com/feed/" category="Neuroscience"/>
+		<outline text="PsyBlog" title="PsyBlog" enabled="true" type="rss" xmlUrl="http://feeds.feedburner.com/PsychologyBlog" category="Psychology"/>
+		<outline text="Moz" title="Moz" enabled="true" type="rss" xmlUrl="http://feeds.feedburner.com/seomoz" category="Marketing"/>
+		<outline text="Engadget" title="Engadget" enabled="false" type="rss" xmlUrl="http://www.engadget.com/rss-full.xml" category="Tech News"/>
+		<outline text="Fast Company" title="Fast Company" enabled="false" type="rss" xmlUrl="http://feeds.feedburner.com/fastcompany/headlines" category="Tech News"/>
+		<outline text="Tech in Asia" title="Tech in Asia" enabled="false" type="rss" xmlUrl="https://feeds2.feedburner.com/PennOlson" category="Tech News"/>
+		<outline text="Steve Blank" title="Steve Blank" enabled="false" type="rss" xmlUrl="http://steveblank.com/feed/" category="Startup"/>
+		<outline text="The singularity is nearer" title="The singularity is nearer" enabled="false" type="rss" xmlUrl="https://geohot.github.io/blog/feed.xml" category="Startup"/>
+		<outline text="Guy Kawasaki" title="Guy Kawasaki" enabled="false" type="rss" xmlUrl="http://guykawasaki.com/feed/" category="Startup"/>
+		<outline text="Both Sides of the Table" title="Both Sides of the Table" enabled="false" type="rss" xmlUrl="http://feeds.feedburner.com/BothSidesOfTheTable" category="Startup"/>
+		<outline text="The Black Box of Product Management - Medium" title="The Black Box of Product Management - Medium" enabled="false" type="rss" xmlUrl="https://medium.com/feed/the-black-box-of-product-management" category="Startup"/>
+		<outline text="Product Life" title="Product Life" enabled="false" type="rss" xmlUrl="https://productlife.to/feed" category="Startup"/>
+		<outline text="Irrational Exuberance" title="Irrational Exuberance" enabled="false" type="rss" xmlUrl="https://lethain.com/feeds/" category="Startup"/>
+		<outline text="Hacker News: Show HN" title="Hacker News: Show HN" enabled="false" type="rss" xmlUrl="http://hnrss.org/show" category="Products &amp; Ideas"/>
+		<outline text="Hacker News: Launches" title="Hacker News: Launches" enabled="false" type="rss" xmlUrl="https://hnrss.org/launches" category="Products &amp; Ideas"/>
+		<outline text="Sachin Rekhi's Blog" title="Sachin Rekhi's Blog" enabled="false" type="rss" xmlUrl="http://feeds.feedburner.com/sachinrekhiblog" category="Products &amp; Ideas"/>
+		<outline text="The Airtable Engineering Blog" title="The Airtable Engineering Blog" enabled="false" type="rss" xmlUrl="https://medium.com/feed/airtable-eng" category="Engineering blogs"/>
+		<outline text="Medium Engineering - Medium" title="Medium Engineering - Medium" enabled="false" type="rss" xmlUrl="https://medium.com/feed/medium-eng" category="Engineering blogs"/>
+		<outline text="The PayPal Technology Blog - Medium" title="The PayPal Technology Blog - Medium" enabled="false" type="rss" xmlUrl="https://medium.com/feed/paypal-engineering" category="Engineering blogs"/>
+		<outline text="Pinterest Engineering Blog - Medium" title="Pinterest Engineering Blog - Medium" enabled="false" type="rss" xmlUrl="https://medium.com/feed/pinterest-engineering" category="Engineering blogs"/>
+		<outline text="Grab Tech" title="Grab Tech" enabled="false" type="rss" xmlUrl="http://engineering.grab.com/feed.xml" category="Engineering blogs"/>
+		<outline text="eBay Tech Blog" title="eBay Tech Blog" enabled="false" type="rss" xmlUrl="http://www.ebaytechblog.com/feed/" category="Engineering blogs"/>
+		<outline text="Spotify Engineering" title="Spotify Engineering" enabled="false" type="rss" xmlUrl="http://labs.spotify.com/feed/" category="Engineering blogs"/>
+		<outline text="Canva Engineering Blog - Medium" title="Canva Engineering Blog - Medium" enabled="false" type="rss" xmlUrl="https://engineering.canva.com/rss" category="Engineering blogs"/>
+		<outline text="The Airbnb Tech Blog - Medium" title="The Airbnb Tech Blog - Medium" enabled="false" type="rss" xmlUrl="https://medium.com/feed/airbnb-engineering" category="Engineering blogs"/>
+		<outline text="Dropbox Tech" title="Dropbox Tech" enabled="false" type="rss" xmlUrl="https://dropbox.tech/feed" category="Engineering blogs"/>
+		<outline text="WePay Engineering Blog" title="WePay Engineering Blog" enabled="false" type="rss" xmlUrl="https://wecode.wepay.com/feed.xml" category="Engineering blogs"/>
+		<outline text="Web Browser Engineering" title="Web Browser Engineering" enabled="false" type="rss" xmlUrl="https://browser.engineering/rss.xml" category="Engineering blogs"/>
+		<outline text="Martin Kleppmann's blog" title="Martin Kleppmann's blog" enabled="false" type="rss" xmlUrl="https://feeds.feedburner.com/martinkl?format=xml" category="Engineering blogs"/>
+		<outline text="Dan Luu" title="Dan Luu" enabled="false" type="rss" xmlUrl="https://danluu.com/atom.xml" category="Engineering blogs"/>
+		<outline text="Grab Tech" title="Grab Tech" enabled="false" type="rss" xmlUrl="https://engineering.grab.com/feed.xml" category="Engineering blogs"/>
+		<outline text="Josh Comeau's blog" title="Josh Comeau's blog" enabled="false" type="rss" xmlUrl="https://joshwcomeau.com/rss.xml" category="Engineering blogs"/>
+		<outline text="Flurries of latent creativity - Stripe CTO blog" title="Flurries of latent creativity - Stripe CTO blog" enabled="false" type="rss" xmlUrl="https://blog.singleton.io/index.xml" category="Engineering blogs"/>
+		<outline text="Sophie Alpert" title="Sophie Alpert" enabled="false" type="rss" xmlUrl="https://sophiebits.com/atom.xml" category="Engineering blogs"/>
+		<outline text="Amjad Masad" title="Amjad Masad" enabled="false" type="rss" xmlUrl="https://amasad.me/rss" category="Engineering blogs"/>
+		<outline text="Signal Blog" title="Signal Blog" enabled="false" type="rss" xmlUrl="https://signal.org/blog/rss.xml" category="Engineering blogs"/>
+		<outline text="Joel on Software" title="Joel on Software" enabled="false" type="rss" xmlUrl="https://www.joelonsoftware.com/feed/" category="Engineering blogs"/>
+		<outline text="Lil’Log" title="Lil’Log" enabled="false" type="rss" xmlUrl="https://lilianweng.github.io/lil-log/feed.xml" category="Machine Learning"/>
+		<outline text="MIT News - Artificial intelligence" title="MIT News - Artificial intelligence" enabled="false" type="rss" xmlUrl="http://news.mit.edu/rss/topic/artificial-intelligence2" category="Machine Learning"/>
+		<outline text="The Berkeley Artificial Intelligence Research Blog" title="The Berkeley Artificial Intelligence Research Blog" enabled="false" type="rss" xmlUrl="http://bair.berkeley.edu/blog/feed.xml" category="Machine Learning"/>
+		<outline text="DeepLearningAI" title="DeepLearningAI" enabled="false" type="rss" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCcIXc5mJsHVYTZR1maL5l9w" category="Machine Learning"/>
+		<outline text="Eric Jang" title="Eric Jang" enabled="false" type="rss" xmlUrl="http://blog.evjang.com/feeds/posts/default?alt=rss" category="Machine Learning"/>
+		<outline text="The Gradient" title="The Gradient" enabled="false" type="rss" xmlUrl="https://thegradient.pub/rss/" category="Machine Learning"/>
+		<outline text="Magenta" title="Magenta" enabled="false" type="rss" xmlUrl="http://magenta.tensorflow.org/feed.xml" category="Machine Learning"/>
+		<outline text="Grammarly Blog" title="Grammarly Blog" enabled="false" type="rss" xmlUrl="https://www.grammarly.com/blog/feed/" category="Machine Learning"/>
+		<outline text="Eric Jang" title="Eric Jang" enabled="false" type="rss" xmlUrl="https://evjang.com/feed" category="Machine Learning"/>
+		<outline text="Machine Learning" title="Machine Learning" enabled="false" type="rss" xmlUrl="http://www.reddit.com/r/MachineLearning/.rss" category="Machine Learning"/>
+		<outline text="Yannic Kilcher" title="Yannic Kilcher" enabled="false" type="rss" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCZHmQk67mSJgfCCTn7xBfew" category="Machine Learning"/>
+		<outline text="UX Planet" title="UX Planet" enabled="false" type="rss" xmlUrl="https://uxplanet.org/feed" category="Design"/>
+		<outline text="NN/g latest articles and announcements" title="NN/g latest articles and announcements" enabled="false" type="rss" xmlUrl="https://www.nngroup.com/feed/rss/" category="Design"/>
+		<outline text="UX Movement" title="UX Movement" enabled="false" type="rss" xmlUrl="http://feeds.feedburner.com/uxmovement" category="Design"/>
+		<outline text="UXmatters" title="UXmatters" enabled="false" type="rss" xmlUrl="https://uxmatters.com/index.xml" category="Design"/>
+		<outline text="web.dev" title="web.dev" enabled="false" type="rss" xmlUrl="https://web.dev/feed.xml" category="Design"/>
+		<outline text="Slack Design" title="Slack Design" enabled="false" type="rss" xmlUrl="https://slack.design/feed/" category="Design"/>
+		<outline text="UX Daily - User Experience Daily" title="UX Daily - User Experience Daily" enabled="false" type="rss" xmlUrl="https://interaction-design.org/rss/site_news.xml" category="Design"/>
+		<outline text="MIT News - Science, Technology, and Society | Technology and society | Program in STS | History of science | History of MIT" title="MIT News - Science, Technology, and Society | Technology and society | Program in STS | History of science | History of MIT" enabled="false" type="rss" xmlUrl="https://news.mit.edu/rss/topic/science-technology-and-society" category="Science"/>
+		<outline text="MIT News" title="MIT News" enabled="false" type="rss" xmlUrl="https://news.mit.edu/rss/research" category="Science"/>
+		<outline text="ScienceAlert" title="ScienceAlert" enabled="false" type="rss" xmlUrl="https://www.sciencealert.com/rss" category="Science"/>
+		<outline text="Singularity Hub" title="Singularity Hub" enabled="false" type="rss" xmlUrl="https://singularityhub.com/feed/" category="Science"/>
+		<outline text="The Decision Lab" title="The Decision Lab" enabled="false" type="rss" xmlUrl="https://thedecisionlab.com/feed/" category="Learning"/>
+		<outline text="Ness Labs" title="Ness Labs" enabled="false" type="rss" xmlUrl="https://nesslabs.com/feed" category="Learning"/>
+		<outline text="The Sunday Wisdom" title="The Sunday Wisdom" enabled="false" type="rss" xmlUrl="https://coffeeandjunk.substack.com/feed" category="Learning"/>
+		<outline text="Commonplace - The Commoncog Blog" title="Commonplace - The Commoncog Blog" enabled="false" type="rss" xmlUrl="https://commoncog.com/blog/rss/" category="Learning"/>
+		<outline text="Psychology Blog" title="Psychology Blog" enabled="false" type="rss" xmlUrl="http://www.all-about-psychology.com/psychology.xml" category="Psychology"/>
+		<outline text="Psychology Headlines Around the World" title="Psychology Headlines Around the World" enabled="false" type="rss" xmlUrl="http://www.socialpsychology.org/headlines.rss" category="Psychology"/>
+		<outline text="Neuroscience News -- ScienceDaily" title="Neuroscience News -- ScienceDaily" enabled="false" type="rss" xmlUrl="https://sciencedaily.com/rss/mind_brain/neuroscience.xml" category="Neuroscience"/>
+		<outline text="Social Media Examiner | Social Media Marketing" title="Social Media Examiner | Social Media Marketing" enabled="false" type="rss" xmlUrl="http://www.socialmediaexaminer.com/feed/" category="Marketing"/>
+		<outline text="John Egan" title="John Egan" enabled="false" type="rss" xmlUrl="http://jwegan.com/feed/rss/" category="Marketing"/>
+		<outline text="Hubspot" title="Hubspot" enabled="false" type="rss" xmlUrl="http://blog.hubspot.com/CMS/UI/Modules/BizBlogger/rss.aspx?tabid=6307&amp;moduleid=8441&amp;maxcount=25" category="Marketing"/>
+		<outline text="Backlinko" title="Backlinko" enabled="false" type="rss" xmlUrl="http://backlinko.com/feed" category="Marketing"/>
 	</body>
 </opml>

@@ -30,8 +30,8 @@ class _FeedScreenState extends State<FeedScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final urls = await _feedService.getEnabledFeedUrls();
-      final items = await _feedService.fetchFeeds(urls);
+      final sources = await _feedService.getEnabledFeedSources();
+      final items = await _feedService.fetchFeeds(sources);
       
       if (mounted) {
         setState(() {
@@ -146,7 +146,7 @@ class _FeedScreenState extends State<FeedScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.source,
+                      '${item.source} • ${item.category}',
                       style: TextStyle(
                         color: Colors.indigoAccent[100],
                         fontSize: 12,

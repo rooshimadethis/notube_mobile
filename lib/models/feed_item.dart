@@ -7,6 +7,7 @@ class FeedItem {
   final String source;
   final String? imageUrl;
 
+  final String category;
 
   FeedItem({
     required this.title,
@@ -15,6 +16,7 @@ class FeedItem {
     this.publishedDate,
     this.publishedDateStr,
     required this.source,
+    required this.category,
     this.imageUrl,
   });
 
