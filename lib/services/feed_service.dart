@@ -30,13 +30,54 @@ class FeedService {
   // But for now we just load every time or rely on caller to manage state
   
   static const String _feedPreferencesKey = 'feed_preferences';
+  static const String _readArticlesKey = 'read_articles';
+  
+  // Limit strictly to keep 'markArticleAsRead' fast (disk write on every tap).
+  // 2000 is safe because RSS feeds usually rotate content (drop old items)
+  // much faster than a user reads 2000 items.
+  static const int _maxReadHistory = 2000;
 
   // Cache for feed items: URL -> Cache Entry
   final Map<String, FeedCacheEntry> _cache = {};
 
+  final Set<String> _readArticleUrls = {};
+  bool _readArticlesLoaded = false;
+
   // Smart TTL: Check for updates after 1 hour.
   // Since we use Conditional GETs (ETag), checks are cheap!
   static const Duration _cacheTtl = Duration(hours: 1);
+
+  Future<void> loadReadArticles() async {
+    if (_readArticlesLoaded) return;
+    
+    final prefs = await SharedPreferences.getInstance();
+    final List<String>? saved = prefs.getStringList(_readArticlesKey);
+    if (saved != null) {
+      _readArticleUrls.addAll(saved);
+    }
+    _readArticlesLoaded = true;
+  }
+
+  Future<void> markArticleAsRead(String url) async {
+    if (!_readArticlesLoaded) await loadReadArticles();
+    
+    if (_readArticleUrls.contains(url)) return; // Already read
+
+    _readArticleUrls.add(url);
+    
+    // Enforce max history size (FIFO)
+    // LinkedHashSet (Dart's default Set) preserves insertion order.
+    // So the first items are the oldest.
+    if (_readArticleUrls.length > _maxReadHistory) {
+      // Create a list to remove the first item safely
+      final first = _readArticleUrls.first;
+      _readArticleUrls.remove(first);
+    }
+
+    // Save to disk
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_readArticlesKey, _readArticleUrls.toList());
+  }
 
   Future<List<FeedSource>> loadFeedSources() async {
     final List<FeedSource> sources = [];
@@ -125,6 +166,9 @@ class FeedService {
   }
 
   Future<List<FeedItem>> fetchFeeds(List<FeedSource> sources, {bool forceRefresh = false}) async {
+    // Ensure read articles are loaded locally
+    if (!_readArticlesLoaded) await loadReadArticles();
+
     // 1. Remove deselected feeds from cache
     final sourceUrls = sources.map((s) => s.url).toSet();
     _cache.removeWhere((url, _) => !sourceUrls.contains(url));
@@ -165,15 +209,22 @@ class FeedService {
       }
     }
 
+    // 4.5. Filter out read articles
+    // We do this AFTER aggregation but BEFORE sorting to reduce sort/render work
+    final filteredItems = allItems.where((item) {
+      // Check if the link is in our read set
+      return !_readArticleUrls.contains(item.link);
+    }).toList();
+
     // 5. Sort
-    allItems.sort((a, b) {
+    filteredItems.sort((a, b) {
       if (a.publishedDate == null && b.publishedDate == null) return 0;
       if (a.publishedDate == null) return 1;
       if (b.publishedDate == null) return -1;
       return b.publishedDate!.compareTo(a.publishedDate!); // Newest first
     });
     
-    return allItems;
+    return filteredItems;
   }
 
   Future<void> _fetchAndUpdateCache(FeedSource source) async {

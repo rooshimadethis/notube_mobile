@@ -139,8 +139,14 @@ class _FeedScreenState extends State<FeedScreen> {
       color: Colors.white.withValues(alpha: 0.1), 
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
+        onTap: () async {
+          // Mark as read in background storage
+          await _feedService.markArticleAsRead(item.link);
+          
+          if (!mounted) return;
+
+          // Navigate to WebView
+          await Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => WebViewScreen(
                 url: item.link,
@@ -149,6 +155,13 @@ class _FeedScreenState extends State<FeedScreen> {
               fullscreenDialog: true,
             ),
           );
+
+          // Upon return, remove from the list
+          if (mounted) {
+            setState(() {
+              _items.removeWhere((i) => i.link == item.link);
+            });
+          }
         },
         onLongPress: () {
           showDialog(
