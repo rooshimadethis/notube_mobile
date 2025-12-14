@@ -4,13 +4,13 @@
 		<title>Fluent Reader Export</title>
 	</head>
 	<body>
-		<outline text="BBC News - World" title="BBC News - World" enabled="true" type="rss" xmlUrl="http://feeds.bbci.co.uk/news/world/rss.xml" category="News"/>
-		<outline text="CNN Top Stories" title="CNN Top Stories" enabled="true" type="rss" xmlUrl="http://rss.cnn.com/rss/cnn_topstories.rss" category="News"/>
-		<outline text="New York Times" title="New York Times" enabled="true" type="rss" xmlUrl="http://feeds.nytimes.com/nyt/rss/HomePage" category="News"/>
-		<outline text="Al Jazeera English" title="Al Jazeera English" enabled="true" type="rss" xmlUrl="https://www.aljazeera.com/xml/rss/all.xml" category="News"/>
-		<outline text="The Guardian" title="The Guardian" enabled="true" type="rss" xmlUrl="https://www.theguardian.com/world/rss" category="News"/>
-		<outline text="NPR News" title="NPR News" enabled="true" type="rss" xmlUrl="http://www.npr.org/rss/rss.php?id=1001" category="News"/>
-		<outline text="Washington Post" title="Washington Post" enabled="true" type="rss" xmlUrl="http://www.washingtonpost.com/rss/" category="News"/>
+		<outline text="BBC News - World" title="BBC News - World" enabled="false" type="rss" xmlUrl="http://feeds.bbci.co.uk/news/world/rss.xml" category="News"/>
+		<outline text="CNN Top Stories" title="CNN Top Stories" enabled="false" type="rss" xmlUrl="http://rss.cnn.com/rss/cnn_topstories.rss" category="News"/>
+		<outline text="New York Times" title="New York Times" enabled="false" type="rss" xmlUrl="http://feeds.nytimes.com/nyt/rss/HomePage" category="News"/>
+		<outline text="Al Jazeera English" title="Al Jazeera English" enabled="false" type="rss" xmlUrl="https://www.aljazeera.com/xml/rss/all.xml" category="News"/>
+		<outline text="The Guardian" title="The Guardian" enabled="false" type="rss" xmlUrl="https://www.theguardian.com/world/rss" category="News"/>
+		<outline text="NPR News" title="NPR News" enabled="false" type="rss" xmlUrl="http://www.npr.org/rss/rss.php?id=1001" category="News"/>
+		<outline text="Washington Post" title="Washington Post" enabled="false" type="rss" xmlUrl="http://www.washingtonpost.com/rss/" category="News"/>
 		<outline text="Netflix Tech Blog" title="Netflix Tech Blog" enabled="true" type="rss" xmlUrl="https://netflixtechblog.com/feed" category="Engineering blogs"/>
 		<outline text="Ars Technica" title="Ars Technica" enabled="true" type="rss" xmlUrl="https://feeds.arstechnica.com/arstechnica/index" category="Tech News"/>
 		<outline text="Stratechery" title="Stratechery" enabled="true" type="rss" xmlUrl="https://stratechery.com/feed/" category="Startup"/>
