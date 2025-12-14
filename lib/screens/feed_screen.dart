@@ -5,6 +5,8 @@ import '../services/feed_service.dart';
 import '../models/feed_item.dart';
 import 'webview_screen.dart';
 
+import 'feed_source_screen.dart';
+
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
 
@@ -28,7 +30,7 @@ class _FeedScreenState extends State<FeedScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final urls = await _feedService.loadFeedUrlsFromAssets();
+      final urls = await _feedService.getEnabledFeedUrls();
       final items = await _feedService.fetchFeeds(urls);
       
       if (mounted) {
@@ -61,6 +63,26 @@ class _FeedScreenState extends State<FeedScreen> {
             color: Colors.white,
           ),
         ),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onSelected: (value) {
+              if (value == 'sources') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const FeedSourceScreen()),
+                ).then((_) => _loadFeeds());
+              }
+            },
+            itemBuilder: (BuildContext context) {
+              return [
+                const PopupMenuItem<String>(
+                  value: 'sources',
+                  child: Text('Choose sources'),
+                ),
+              ];
+            },
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

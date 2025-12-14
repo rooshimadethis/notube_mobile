@@ -5,7 +5,30 @@ import 'package:xml/xml.dart';
 
 import 'dart:developer' as developer;
 import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/feed_item.dart';
+
+class FeedSource {
+  final String title;
+  final String url;
+  final bool enabled;
+  
+  const FeedSource({
+    required this.title, 
+    required this.url,
+    this.enabled = true,
+  });
+  
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FeedSource &&
+          runtimeType == other.runtimeType &&
+          url == other.url;
+
+  @override
+  int get hashCode => url.hashCode;
+}
 
 class FeedService {
   final http.Client _client = http.Client();
@@ -13,25 +36,42 @@ class FeedService {
   // Cache for feed URLs to avoid re-parsing OPML constantly if not needed
   // But for now we just load every time or rely on caller to manage state
   
-  Future<List<String>> loadFeedUrlsFromAssets() async {
-    final List<String> urls = [];
+  static const String _disabledFeedsKey = 'disabled_feed_urls';
+
+  Future<List<FeedSource>> loadFeedSources() async {
+    final List<FeedSource> sources = [];
     try {
       // Load feeds.opml
       final feedsOpml = await rootBundle.loadString('feeds.opml');
-      urls.addAll(_parseOpml(feedsOpml));
-      
-      // Load United States.opml
-      final usOpml = await rootBundle.loadString('United States.opml');
-      urls.addAll(_parseOpml(usOpml));
-      
+      sources.addAll(_parseOpml(feedsOpml));
     } catch (e) {
       developer.log("Error loading OPML assets: $e");
     }
-    return urls.toSet().toList(); // Remove duplicates
+    return sources; // Duplicates handled in parsing or assumed unique by URL
   }
 
-  List<String> _parseOpml(String opmlContent) {
-    final List<String> urls = [];
+  Future<Set<String>> getDisabledUrls() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_disabledFeedsKey)?.toSet() ?? {};
+  }
+
+  Future<void> setDisabledUrls(Set<String> disabledUrls) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_disabledFeedsKey, disabledUrls.toList());
+  }
+
+  // Helper to get only enabled URLs
+  Future<List<String>> getEnabledFeedUrls() async {
+    final allSources = await loadFeedSources();
+    final disabled = await getDisabledUrls();
+    return allSources
+        .where((s) => s.enabled && !disabled.contains(s.url))
+        .map((s) => s.url)
+        .toList();
+  }
+
+  List<FeedSource> _parseOpml(String opmlContent) {
+    final List<FeedSource> sources = [];
     try {
       final document = XmlDocument.parse(opmlContent);
       final outlines = document.findAllElements('outline');
@@ -39,15 +79,18 @@ class FeedService {
       for (var node in outlines) {
         final type = node.getAttribute('type');
         final xmlUrl = node.getAttribute('xmlUrl');
+        final title = node.getAttribute('title') ?? node.getAttribute('text') ?? 'Unknown Config';
+        final enabledStr = node.getAttribute('enabled');
+        final isEnabled = enabledStr?.toLowerCase() != 'false'; // Default to true if missing or not false
         
         if (type == 'rss' && xmlUrl != null && xmlUrl.isNotEmpty) {
-          urls.add(xmlUrl);
+          sources.add(FeedSource(title: title, url: xmlUrl, enabled: isEnabled));
         }
       }
     } catch (e) {
       developer.log("Error parsing OPML: $e");
     }
-    return urls;
+    return sources;
   }
 
   Future<List<FeedItem>> fetchFeeds(List<String> urls) async {
