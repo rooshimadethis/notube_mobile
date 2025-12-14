@@ -7,6 +7,7 @@ class FeedItem {
   final String source;
   final String sourceUrl;
   final String? imageUrl;
+  final String? sourceIconUrl;
 
   final String category;
 
@@ -20,6 +21,7 @@ class FeedItem {
     required this.sourceUrl,
     required this.category,
     this.imageUrl,
+    this.sourceIconUrl,
   });
 
   @override

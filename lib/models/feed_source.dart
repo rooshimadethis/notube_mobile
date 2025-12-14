@@ -3,12 +3,14 @@ class FeedSource {
   final String url;
   final String category;
   final bool enabled;
+  final String? iconUrl;
   
   const FeedSource({
     required this.title, 
     required this.url,
     required this.category,
     this.enabled = true,
+    this.iconUrl,
   });
   
   @override

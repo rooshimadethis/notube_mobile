@@ -342,6 +342,23 @@ class _FeedScreenState extends State<FeedScreen> {
                     fadeInDuration: const Duration(milliseconds: 300),
                   ),
                 ),
+              ] else if (item.sourceIconUrl != null) ...[
+                 // Fallback to source icon if no article image
+                 const SizedBox(width: 16),
+                 ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: CachedNetworkImage(
+                    imageUrl: item.sourceIconUrl!,
+                    width: 80,
+                    height: 80,
+                    // Favicons might be small, so we might not want memCacheWidth large or maybe we do to avoid blur if upscaled?
+                    // Actually Google Favicons with sz=64 are 64x64. Upscaling 80x80 is fine.
+                    fit: BoxFit.contain, // Contain so we don't crop the logo
+                    placeholder: (context, url) => const SizedBox(width: 80, height: 80),
+                    errorWidget: (context, url, error) => const SizedBox.shrink(),
+                    fadeInDuration: const Duration(milliseconds: 300),
+                  ),
+                ),
               ],
             ],
           ),

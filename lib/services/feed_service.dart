@@ -152,11 +152,24 @@ class FeedService {
         final isEnabled = enabledStr?.toLowerCase() != 'false'; // Default to true if missing or not false
         
         if (type == 'rss' && xmlUrl != null && xmlUrl.isNotEmpty) {
+          // Generate favicon URL
+          String? iconUrl;
+          try {
+            final uri = Uri.parse(xmlUrl);
+             // Google Favicon Service: https://www.google.com/s2/favicons?domain=example.com&sz=64
+            if (uri.host.isNotEmpty) {
+              iconUrl = 'https://www.google.com/s2/favicons?domain=${uri.host}&sz=64';
+            }
+          } catch (_) {
+            // Ignore parse errors, just no icon
+          }
+
           sources.add(FeedSource(
             title: title, 
             url: xmlUrl, 
             category: category,
             enabled: isEnabled,
+            iconUrl: iconUrl,
           ));
         }
       }
@@ -341,6 +354,7 @@ class FeedService {
           'xml': response.body, 
           'url': source.url,
           'category': source.category,
+          'iconUrl': source.iconUrl,
         });
 
         return FetchResult.success(
@@ -391,8 +405,9 @@ List<FeedItem> _parseAndFilterFeed(Map<String, dynamic> args) {
   final xmlString = args['xml'] as String;
   final feedUrl = args['url'] as String;
   final category = args['category'] as String;
+  final sourceIconUrl = args['iconUrl'] as String?;
   
-  final items = _parseFeedXml(xmlString, feedUrl, category);
+  final items = _parseFeedXml(xmlString, feedUrl, category, sourceIconUrl);
   
   // Create ML sentiment analyzer with custom negative words
   // final mlAnalyzer = _createSentimentAnalyzer();
@@ -446,26 +461,26 @@ List<FeedItem> _parseAndFilterFeed(Map<String, dynamic> args) {
   }).toList();
 }
 
-List<FeedItem> _parseFeedXml(String xmlString, String feedUrl, String category) {
+List<FeedItem> _parseFeedXml(String xmlString, String feedUrl, String category, String? sourceIconUrl) {
   try {
     final document = XmlDocument.parse(xmlString);
     
     // Check for RSS
     final rss = document.findAllElements('rss').firstOrNull;
     if (rss != null) {
-      return _parseRss(document, category, feedUrl);
+      return _parseRss(document, category, feedUrl, sourceIconUrl);
     }
     
     // Check for Atom
     final feed = document.findAllElements('feed').firstOrNull;
     if (feed != null) {
-      return _parseAtom(document, category, feedUrl);
+      return _parseAtom(document, category, feedUrl, sourceIconUrl);
     }
 
     // RDF/RSS 1.0
     final rdf = document.findAllElements('rdf:RDF').firstOrNull;
     if (rdf != null) {
-       return _parseRss(document, category, feedUrl); // Structure is similar enough mostly
+       return _parseRss(document, category, feedUrl, sourceIconUrl); // Structure is similar enough mostly
     }
     
   } catch (e) {
@@ -474,7 +489,7 @@ List<FeedItem> _parseFeedXml(String xmlString, String feedUrl, String category) 
   return [];
 }
 
-List<FeedItem> _parseRss(XmlDocument document, String category, String sourceUrl) {
+List<FeedItem> _parseRss(XmlDocument document, String category, String sourceUrl, String? sourceIconUrl) {
   final items = <FeedItem>[];
   final channel = document.findAllElements('channel').firstOrNull;
   final sourceTitle = channel?.findElements('title').firstOrNull?.innerText ?? 'Unknown Source';
@@ -540,13 +555,15 @@ List<FeedItem> _parseRss(XmlDocument document, String category, String sourceUrl
       source: _cleanText(sourceTitle),
       sourceUrl: sourceUrl,
       category: category,
+      category: category,
       imageUrl: imageUrl,
+      sourceIconUrl: sourceIconUrl,
     ));
   }
   return items;
 }
 
-List<FeedItem> _parseAtom(XmlDocument document, String category, String sourceUrl) {
+List<FeedItem> _parseAtom(XmlDocument document, String category, String sourceUrl, String? sourceIconUrl) {
   final items = <FeedItem>[];
   final feedTitle = document.findAllElements('title').firstOrNull?.innerText ?? 'Unknown Source';
 
@@ -620,7 +637,9 @@ List<FeedItem> _parseAtom(XmlDocument document, String category, String sourceUr
       source: _cleanText(feedTitle),
       sourceUrl: sourceUrl,
       category: category,
+      category: category,
       imageUrl: imageUrl,
+      sourceIconUrl: sourceIconUrl,
     ));
   }
   return items;
