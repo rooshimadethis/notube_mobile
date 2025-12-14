@@ -7,36 +7,21 @@ import 'package:xml/xml.dart';
 
 import 'dart:developer' as developer;
 import 'dart:io';
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // import 'sentiment_ai_service.dart'; // Disabled - native library issues
 import '../models/feed_item.dart';
+import '../models/feed_source.dart';
+import '../models/feed_cache.dart';
 
-class FeedSource {
-  final String title;
-  final String url;
-  final String category;
-  final bool enabled;
-  
-  const FeedSource({
-    required this.title, 
-    required this.url,
-    required this.category,
-    this.enabled = true,
-  });
-  
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is FeedSource &&
-          runtimeType == other.runtimeType &&
-          url == other.url;
 
-  @override
-  int get hashCode => url.hashCode;
-}
 
 class FeedService {
+  static final FeedService _instance = FeedService._internal();
+  factory FeedService() => _instance;
+  FeedService._internal();
+
   final http.Client _client = http.Client();
   // final SentimentAiService _aiService = SentimentAiService(); // Disabled
   // bool _aiInitialized = false; // Disabled
@@ -44,11 +29,10 @@ class FeedService {
   // Cache for feed URLs to avoid re-parsing OPML constantly if not needed
   // But for now we just load every time or rely on caller to manage state
   
-  static const String _disabledFeedsKey = 'disabled_feed_urls';
-  static const String _explicitlyEnabledFeedsKey = 'explicitly_enabled_feed_urls';
+  static const String _feedPreferencesKey = 'feed_preferences';
 
   // Cache for feed items: URL -> Cache Entry
-  final Map<String, _FeedCacheEntry> _cache = {};
+  final Map<String, FeedCacheEntry> _cache = {};
 
   // Smart TTL: Check for updates after 1 hour.
   // Since we use Conditional GETs (ETag), checks are cheap!
@@ -66,34 +50,48 @@ class FeedService {
     return sources; // Duplicates handled in parsing or assumed unique by URL
   }
 
-  Future<Set<String>> getDisabledUrls() async {
+  // Returns Map<Url, IsEnabled>
+  Future<Map<String, bool>> getFeedPreferences() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getStringList(_disabledFeedsKey)?.toSet() ?? {};
+    final jsonString = prefs.getString(_feedPreferencesKey);
+    if (jsonString == null) return {};
+    
+    try {
+      final Map<String, dynamic> jsonMap = jsonDecode(jsonString);
+      return jsonMap.map((key, value) => MapEntry(key, value as bool));
+    } catch (e) {
+      developer.log("Error parsing feed preferences: $e");
+      return {};
+    }
   }
 
-  Future<void> setDisabledUrls(Set<String> disabledUrls) async {
+  Future<void> _savePreferences(Map<String, bool> preferences) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_disabledFeedsKey, disabledUrls.toList());
+    await prefs.setString(_feedPreferencesKey, jsonEncode(preferences));
   }
 
-  Future<Set<String>> getExplicitlyEnabledUrls() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getStringList(_explicitlyEnabledFeedsKey)?.toSet() ?? {};
+  Future<void> updateFeedEnabledState(String url, bool isEnabled) async {
+    final prefs = await getFeedPreferences();
+    prefs[url] = isEnabled;
+    await _savePreferences(prefs);
   }
 
-  Future<void> setExplicitlyEnabledUrls(Set<String> enabledUrls) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_explicitlyEnabledFeedsKey, enabledUrls.toList());
+  Future<void> disableFeedSource(String url) async {
+    await updateFeedEnabledState(url, false);
+  }
+
+  bool isFeedEnabled(FeedSource source, Map<String, bool> preferences) {
+    // If user has an explicit preference, use it. Otherwise use default.
+    return preferences[source.url] ?? source.enabled;
   }
 
   // Helper to get only enabled URLs
   Future<List<FeedSource>> getEnabledFeedSources() async {
     final allSources = await loadFeedSources();
-    final disabled = await getDisabledUrls();
-    final enabledOverrides = await getExplicitlyEnabledUrls();
+    final prefs = await getFeedPreferences();
     
     return allSources
-        .where((s) => (s.enabled || enabledOverrides.contains(s.url)) && !disabled.contains(s.url))
+        .where((s) => isFeedEnabled(s, prefs))
         .toList();
   }
 
@@ -188,22 +186,22 @@ class FeedService {
       lastModified: cached?.lastModified,
     );
 
-    if (result.status == _FetchStatus.notModified) {
+    if (result.status == FetchStatus.notModified) {
       // 304: Server says our cache is still good. Just update timestamp.
       developer.log("✅ 304 Not Modified: ${source.title}");
       if (cached != null) {
-        _cache[source.url] = _FeedCacheEntry(
+        _cache[source.url] = FeedCacheEntry(
           items: cached.items, // Keep old items
           timestamp: DateTime.now(),
           etag: cached.etag, // Keep old headers
           lastModified: cached.lastModified,
         );
       }
-    } else if (result.status == _FetchStatus.success) {
+    } else if (result.status == FetchStatus.success) {
       // 200: New content!
       developer.log("⬇️ Fetched New Content: ${source.title} (${result.items.length} items)");
       if (result.items.isNotEmpty) {
-        _cache[source.url] = _FeedCacheEntry(
+        _cache[source.url] = FeedCacheEntry(
           items: result.items,
           timestamp: DateTime.now(),
           etag: result.etag,
@@ -213,7 +211,7 @@ class FeedService {
     }
   }
 
-  Future<_FetchResult> _fetchFeed(FeedSource source, {String? etag, String? lastModified}) async {
+  Future<FetchResult> _fetchFeed(FeedSource source, {String? etag, String? lastModified}) async {
     try {
       final headers = <String, String>{
         'User-Agent':
@@ -232,7 +230,7 @@ class FeedService {
       ).timeout(const Duration(seconds: 10));
       
       if (response.statusCode == 304) {
-        return _FetchResult.notModified();
+        return FetchResult.notModified();
       } else if (response.statusCode == 200) {
         final items = await compute(_parseAndFilterFeed, {
           'xml': response.body, 
@@ -240,7 +238,7 @@ class FeedService {
           'category': source.category,
         });
 
-        return _FetchResult.success(
+        return FetchResult.success(
           items: items, 
           etag: response.headers['etag'], 
           lastModified: response.headers['last-modified'],
@@ -251,7 +249,7 @@ class FeedService {
     } catch (e) {
       developer.log("Error fetching feed ${source.url}: $e");
     }
-    return _FetchResult.error();
+    return FetchResult.error();
   }
 
 }
@@ -350,19 +348,19 @@ List<FeedItem> _parseFeedXml(String xmlString, String feedUrl, String category) 
     // Check for RSS
     final rss = document.findAllElements('rss').firstOrNull;
     if (rss != null) {
-      return _parseRss(document, category);
+      return _parseRss(document, category, feedUrl);
     }
     
     // Check for Atom
     final feed = document.findAllElements('feed').firstOrNull;
     if (feed != null) {
-      return _parseAtom(document, category);
+      return _parseAtom(document, category, feedUrl);
     }
 
     // RDF/RSS 1.0
     final rdf = document.findAllElements('rdf:RDF').firstOrNull;
     if (rdf != null) {
-       return _parseRss(document, category); // Structure is similar enough mostly
+       return _parseRss(document, category, feedUrl); // Structure is similar enough mostly
     }
     
   } catch (e) {
@@ -371,7 +369,7 @@ List<FeedItem> _parseFeedXml(String xmlString, String feedUrl, String category) 
   return [];
 }
 
-List<FeedItem> _parseRss(XmlDocument document, String category) {
+List<FeedItem> _parseRss(XmlDocument document, String category, String sourceUrl) {
   final items = <FeedItem>[];
   final channel = document.findAllElements('channel').firstOrNull;
   final sourceTitle = channel?.findElements('title').firstOrNull?.innerText ?? 'Unknown Source';
@@ -435,6 +433,7 @@ List<FeedItem> _parseRss(XmlDocument document, String category) {
       description: _cleanText(description),
       publishedDate: pubDate,
       source: _cleanText(sourceTitle),
+      sourceUrl: sourceUrl,
       category: category,
       imageUrl: imageUrl,
     ));
@@ -442,7 +441,7 @@ List<FeedItem> _parseRss(XmlDocument document, String category) {
   return items;
 }
 
-List<FeedItem> _parseAtom(XmlDocument document, String category) {
+List<FeedItem> _parseAtom(XmlDocument document, String category, String sourceUrl) {
   final items = <FeedItem>[];
   final feedTitle = document.findAllElements('title').firstOrNull?.innerText ?? 'Unknown Source';
 
@@ -514,6 +513,7 @@ List<FeedItem> _parseAtom(XmlDocument document, String category) {
       description: _cleanText(description),
       publishedDate: pubDate,
       source: _cleanText(feedTitle),
+      sourceUrl: sourceUrl,
       category: category,
       imageUrl: imageUrl,
     ));
@@ -545,37 +545,6 @@ String _cleanText(String text) {
   return text.replaceAll(RegExp(r'<[^>]*>'), '').trim();
 }
 
-class _FeedCacheEntry {
-  final List<FeedItem> items;
-  final DateTime timestamp; // When we last successfully checked (200 or 304)
-  final String? etag;
-  final String? lastModified;
 
-  _FeedCacheEntry({
-    required this.items, 
-    required this.timestamp,
-    this.etag,
-    this.lastModified,
-  });
-}
 
-enum _FetchStatus { success, notModified, error }
 
-class _FetchResult {
-  final _FetchStatus status;
-  final List<FeedItem> items;
-  final String? etag;
-  final String? lastModified;
-
-  _FetchResult.success({
-    required this.items, 
-    this.etag, 
-    this.lastModified
-  }) : status = _FetchStatus.success;
-
-  _FetchResult.notModified() 
-      : status = _FetchStatus.notModified, items = [], etag = null, lastModified = null;
-
-  _FetchResult.error() 
-      : status = _FetchStatus.error, items = [], etag = null, lastModified = null;
-}

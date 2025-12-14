@@ -150,6 +150,54 @@ class _FeedScreenState extends State<FeedScreen> {
             ),
           );
         },
+        onLongPress: () {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              backgroundColor: const Color(0xFF1E293B), // Matches card/theme color somewhat
+              title: const Text('Hide Source', style: TextStyle(color: Colors.white)),
+              content: Text(
+                'Stop showing articles from "${item.source}"?', 
+                style: const TextStyle(color: Colors.white70)
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    // Capture scaffold messenger before async gap
+                    final scaffoldMessenger = ScaffoldMessenger.of(context);
+                    Navigator.pop(context);
+                    
+                    await _feedService.disableFeedSource(item.sourceUrl);
+                    
+                    if (mounted) {
+                      setState(() {
+                        _items.removeWhere((i) => i.sourceUrl == item.sourceUrl);
+                      });
+                      
+                      scaffoldMessenger.showSnackBar(
+                        SnackBar(
+                          content: Text('Hidden ${item.source}'),
+                          backgroundColor: const Color(0xFF1E293B),
+                          action: SnackBarAction(
+                            label: 'Undo',
+                            onPressed: () {
+                              // Re-enable logic would go here
+                            },
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Hide', style: TextStyle(color: Colors.redAccent)),
+                ),
+              ],
+            ),
+          );
+        },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16.0),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/feed_service.dart';
+import '../models/feed_source.dart';
 
 class FeedSourceScreen extends StatefulWidget {
   const FeedSourceScreen({super.key});
@@ -12,8 +13,8 @@ class _FeedSourceScreenState extends State<FeedSourceScreen> {
   final FeedService _feedService = FeedService();
   
   List<FeedSource> _allSources = [];
-  Set<String> _disabledUrls = {};
-  Set<String> _enabledOverrides = {};
+
+  Map<String, bool> _preferences = {};
   bool _isLoading = true;
 
   @override
@@ -26,14 +27,12 @@ class _FeedSourceScreenState extends State<FeedSourceScreen> {
     setState(() => _isLoading = true);
     try {
       final sources = await _feedService.loadFeedSources();
-      final disabled = await _feedService.getDisabledUrls();
-      final enabledOverrides = await _feedService.getExplicitlyEnabledUrls();
+      final prefs = await _feedService.getFeedPreferences();
       
       if (mounted) {
         setState(() {
           _allSources = sources;
-          _disabledUrls = disabled;
-          _enabledOverrides = enabledOverrides;
+          _preferences = prefs;
           _isLoading = false;
         });
       }
@@ -50,23 +49,18 @@ class _FeedSourceScreenState extends State<FeedSourceScreen> {
   Future<void> _toggleSource(String url, bool? isChecked) async {
     if (isChecked == null) return;
     
-    setState(() {
-      if (isChecked) {
-        _disabledUrls.remove(url);
-        // If default is disabled, we must explicitly enable it
-        // Find the source definition to check default 'enabled' state
-        final source = _allSources.firstWhere((s) => s.url == url, orElse: () => const FeedSource(title: '', url: '', category: '', enabled: true));
-        if (!source.enabled) {
-          _enabledOverrides.add(url);
-        }
-      } else {
-        _disabledUrls.add(url);
-        _enabledOverrides.remove(url);
-      }
-    });
+    // Optimistic Update
+    // Single Source of Truth: Update service first, then refresh state
+    await _feedService.updateFeedEnabledState(url, isChecked);
     
-    await _feedService.setDisabledUrls(_disabledUrls);
-    await _feedService.setExplicitlyEnabledUrls(_enabledOverrides);
+    // Refresh lists from service to reflect changes
+    final prefs = await _feedService.getFeedPreferences();
+
+    if (mounted) {
+      setState(() {
+        _preferences = prefs;
+      });
+    }
   }
 
   @override
@@ -94,7 +88,8 @@ class _FeedSourceScreenState extends State<FeedSourceScreen> {
               itemCount: _allSources.length,
               itemBuilder: (context, index) {
                 final source = _allSources[index];
-                final isEnabled = (source.enabled || _enabledOverrides.contains(source.url)) && !_disabledUrls.contains(source.url);
+
+                final isEnabled = _feedService.isFeedEnabled(source, _preferences);
 
                 return CheckboxListTile(
                   title: Text(

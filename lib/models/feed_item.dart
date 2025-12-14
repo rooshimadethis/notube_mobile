@@ -5,6 +5,7 @@ class FeedItem {
   final String? publishedDateStr; // Keep original string just in case
   final DateTime? publishedDate;
   final String source;
+  final String sourceUrl;
   final String? imageUrl;
 
   final String category;
@@ -16,6 +17,7 @@ class FeedItem {
     this.publishedDate,
     this.publishedDateStr,
     required this.source,
+    required this.sourceUrl,
     required this.category,
     this.imageUrl,
   });
