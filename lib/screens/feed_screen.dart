@@ -27,24 +27,46 @@ class _FeedScreenState extends State<FeedScreen> {
 
   Future<void> _loadFeeds({bool forceRefresh = false}) async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    
+    // Only set loading to true initially if we have no items to show
+    if (_items.isEmpty) {
+      setState(() => _isLoading = true);
+    }
 
     try {
       final sources = await _feedService.getEnabledFeedSources();
-      // Pass forceRefresh to service
-      final items = await _feedService.fetchFeeds(sources, forceRefresh: forceRefresh);
       
-      if (mounted) {
-        setState(() {
-          _items = items;
-          _isLoading = false;
-        });
-      }
+      // Listen to the stream
+      _feedService.fetchFeedsStream(sources, forceRefresh: forceRefresh).listen(
+        (items) {
+          if (mounted) {
+            setState(() {
+              _items = items;
+              _isLoading = false; // We have something to show, or at least cache is empty
+            });
+          }
+        },
+        onError: (e) {
+          if (mounted) {
+            // Don't hide existing content on error necessarily, but show snackbar
+             ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error updating feeds: $e')),
+            );
+            setState(() => _isLoading = false);
+          }
+        },
+        onDone: () {
+          if (mounted) {
+             setState(() => _isLoading = false);
+          }
+        },
+      );
+      
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading feeds: $e')),
+          SnackBar(content: Text('Error starting feed load: $e')),
         );
       }
     }

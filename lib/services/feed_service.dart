@@ -8,6 +8,7 @@ import 'package:xml/xml.dart';
 import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:convert';
+import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // import 'sentiment_ai_service.dart'; // Disabled - native library issues
@@ -170,60 +171,115 @@ class FeedService {
     return _readArticleUrls.contains(url);
   }
 
-  Future<List<FeedItem>> fetchFeeds(List<FeedSource> sources, {bool forceRefresh = false}) async {
-    // Ensure read articles are loaded locally
-    if (!_readArticlesLoaded) await loadReadArticles();
+  Stream<List<FeedItem>> fetchFeedsStream(List<FeedSource> sources, {bool forceRefresh = false}) {
+    final controller = StreamController<List<FeedItem>>();
+    // Start fetching without awaiting, so we return the stream immediately
+    _startStreamFetching(sources, forceRefresh, controller);
+    return controller.stream;
+  }
 
-    // 1. Remove deselected feeds from cache
-    final sourceUrls = sources.map((s) => s.url).toSet();
-    _cache.removeWhere((url, _) => !sourceUrls.contains(url));
+  Future<void> _startStreamFetching(
+      List<FeedSource> sources, bool forceRefresh, StreamController<List<FeedItem>> controller) async {
+    try {
+      // Ensure read articles are loaded locally
+      if (!_readArticlesLoaded) await loadReadArticles();
 
-    // 2. Identify which sources need fetching
-    final List<Future<void>> fetchFutures = [];
+      // 1. Remove deselected feeds from cache
+      final sourceUrls = sources.map((s) => s.url).toSet();
+      _cache.removeWhere((url, _) => !sourceUrls.contains(url));
 
-    for (var source in sources) {
-      final cachedEntry = _cache[source.url];
-      
-      // Check if cache is valid (exists AND not expired)
-      bool isCacheValid = false;
-      if (cachedEntry != null) {
-        final age = DateTime.now().difference(cachedEntry.timestamp);
-        if (age < _cacheTtl) {
-          isCacheValid = true;
-        } else {
-          developer.log("Cache expired for ${source.title} (Age: ${age.inHours}h)");
+      // 2. Prepare initial state from cache
+      final currentItems = <FeedItem>[];
+      final List<FeedSource> sourcesToFetch = [];
+
+      for (var source in sources) {
+        final cachedEntry = _cache[source.url];
+
+        bool isCacheValid = false;
+        if (cachedEntry != null) {
+          final age = DateTime.now().difference(cachedEntry.timestamp);
+          if (age < _cacheTtl) {
+            isCacheValid = true;
+            currentItems.addAll(cachedEntry.items);
+          } else {
+            developer.log("Cache expired for ${source.title} (Age: ${age.inHours}h)");
+          }
+        }
+
+        if (forceRefresh || !isCacheValid) {
+          sourcesToFetch.add(source);
+        } else if (cachedEntry != null) {
+          // Keep existing items if valid
         }
       }
 
-      // Fetch if forced refresh OR cache invalid (missing or expired)
-      if (forceRefresh || !isCacheValid) {
-        fetchFutures.add(_fetchAndUpdateCache(source));
-      }
-    }
+      // Initial yield: Show what we have in cache immediately
+      // Sort first
+      _sortItems(currentItems);
+      if (!controller.isClosed) controller.add(List<FeedItem>.from(currentItems));
 
-    // 3. Wait for all fetches to complete
-    if (fetchFutures.isNotEmpty) {
-      await Future.wait(fetchFutures);
+      if (sourcesToFetch.isEmpty) {
+        await controller.close();
+        return;
+      }
+
+      // 3. Parallel Fetching
+      // We process each source in parallel. When one finishes, we update the stream.
+      // We must guard against controller being closed if widget is disposed.
+
+      await Future.wait(sourcesToFetch.map((source) async {
+        try {
+          await _fetchAndUpdateCache(source);
+          
+          if (controller.isClosed) return;
+
+          // Re-aggregate everything safely
+          // This is slightly inefficient (O(N*M)) but N (sources) and M (Total items) are small enough (<2000 items)
+          final newItems = <FeedItem>[];
+          for (var s in sources) {
+            if (_cache.containsKey(s.url)) {
+              newItems.addAll(_cache[s.url]!.items);
+            }
+          }
+          _sortItems(newItems);
+          
+          if (!controller.isClosed) {
+            controller.add(newItems);
+          }
+        } catch (e) {
+            // Individual feed failure shouldn't kill the whole stream
+            developer.log("Error in stream fetch for ${source.url}: $e");
+        }
+      }));
+
+      if (!controller.isClosed) await controller.close();
+    } catch (e) {
+      if (!controller.isClosed) controller.addError(e);
+      if (!controller.isClosed) await controller.close();
     }
+  }
     
-    // 4. Aggregate all items from cache
-    final allItems = <FeedItem>[];
-    for (var source in sources) {
-      if (_cache.containsKey(source.url)) {
-        allItems.addAll(_cache[source.url]!.items);
-      }
-    }
 
-    // 5. Sort
-    allItems.sort((a, b) {
+  
+  void _sortItems(List<FeedItem> items) {
+    items.sort((a, b) {
       if (a.publishedDate == null && b.publishedDate == null) return 0;
       if (a.publishedDate == null) return 1;
       if (b.publishedDate == null) return -1;
-      return b.publishedDate!.compareTo(a.publishedDate!); // Newest first
+      return b.publishedDate!.compareTo(a.publishedDate!); 
     });
-    
-    return allItems;
   }
+
+  // Keeping original for backward compatibility or easy migration, but implementing it using the stream or leaving as is?
+  // I will LEAVE existing fetchFeeds as is for safety (or reimplement it to wait for stream last element) 
+  // and ADD the new one.
+  
+  Future<List<FeedItem>> fetchFeeds(List<FeedSource> sources, {bool forceRefresh = false}) async {
+    // Just wait for the last emission of the stream
+    return await fetchFeedsStream(sources, forceRefresh: forceRefresh).last;
+  }
+
+
 
   Future<void> _fetchAndUpdateCache(FeedSource source) async {
     final cached = _cache[source.url];
