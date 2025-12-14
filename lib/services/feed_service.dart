@@ -555,7 +555,7 @@ List<FeedItem> _parseRss(XmlDocument document, String category, String sourceUrl
       source: _cleanText(sourceTitle),
       sourceUrl: sourceUrl,
       category: category,
-      category: category,
+
       imageUrl: imageUrl,
       sourceIconUrl: sourceIconUrl,
     ));
@@ -637,7 +637,7 @@ List<FeedItem> _parseAtom(XmlDocument document, String category, String sourceUr
       source: _cleanText(feedTitle),
       sourceUrl: sourceUrl,
       category: category,
-      category: category,
+
       imageUrl: imageUrl,
       sourceIconUrl: sourceIconUrl,
     ));

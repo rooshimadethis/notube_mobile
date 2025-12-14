@@ -327,14 +327,14 @@ class _FeedScreenState extends State<FeedScreen> {
                   borderRadius: BorderRadius.circular(8),
                   child: CachedNetworkImage(
                     imageUrl: item.imageUrl!,
-                    width: 80,
-                    height: 80,
-                    memCacheWidth: 240, // Optimization: Decode only what we need (80 * 3x pixel density)
-                    memCacheHeight: 240,
+                    width: 68,
+                    height: 68,
+                    memCacheWidth: 204, // Optimization: Decode only what we need (68 * 3x pixel density)
+                    memCacheHeight: 204,
                     fit: BoxFit.cover,
                     placeholder: (context, url) => Container(
-                      width: 80,
-                      height: 80,
+                      width: 68,
+                      height: 68,
                       color: Colors.white.withValues(alpha: 0.05),
                       child: const Center(child: Icon(Icons.image, color: Colors.grey)),
                     ),
@@ -349,12 +349,12 @@ class _FeedScreenState extends State<FeedScreen> {
                   borderRadius: BorderRadius.circular(8),
                   child: CachedNetworkImage(
                     imageUrl: item.sourceIconUrl!,
-                    width: 80,
-                    height: 80,
+                    width: 68,
+                    height: 68,
                     // Favicons might be small, so we might not want memCacheWidth large or maybe we do to avoid blur if upscaled?
-                    // Actually Google Favicons with sz=64 are 64x64. Upscaling 80x80 is fine.
+                    // Actually Google Favicons with sz=64 are 64x64. Upscaling 68x68 is fine.
                     fit: BoxFit.contain, // Contain so we don't crop the logo
-                    placeholder: (context, url) => const SizedBox(width: 80, height: 80),
+                    placeholder: (context, url) => const SizedBox(width: 68, height: 68),
                     errorWidget: (context, url, error) => const SizedBox.shrink(),
                     fadeInDuration: const Duration(milliseconds: 300),
                   ),
