@@ -4,6 +4,13 @@
 		<title>Fluent Reader Export</title>
 	</head>
 	<body>
+		<outline text="Netflix Tech Blog" title="Netflix Tech Blog" enabled="true" type="rss" xmlUrl="https://netflixtechblog.com/feed" category="Engineering blogs"/>
+		<outline text="Ars Technica" title="Ars Technica" enabled="true" type="rss" xmlUrl="https://feeds.arstechnica.com/arstechnica/index" category="Tech News"/>
+		<outline text="Stratechery" title="Stratechery" enabled="true" type="rss" xmlUrl="https://stratechery.com/feed/" category="Startup"/>
+		<outline text="Andrej Karpathy" title="Andrej Karpathy" enabled="true" type="rss" xmlUrl="https://karpathy.github.io/feed.xml" category="Machine Learning"/>
+		<outline text="Wait But Why" title="Wait But Why" enabled="true" type="rss" xmlUrl="https://waitbutwhy.com/feed" category="Learning"/>
+		<outline text="Stack Overflow Blog" title="Stack Overflow Blog" enabled="true" type="rss" xmlUrl="https://stackoverflow.blog/feed/" category="Engineering blogs"/>
+		<outline text="Paul Graham" title="Paul Graham" enabled="true" type="rss" xmlUrl="http://www.aaronsw.com/2002/feeds/pgessays.rss" category="Startup"/>
 		<outline text="Hacker News" title="Hacker News" enabled="true" type="rss" xmlUrl="http://news.ycombinator.com/rss" category="Startup"/>
 		<outline text="The Verge" title="The Verge" enabled="true" type="rss" xmlUrl="http://www.theverge.com/rss/full.xml" category="Tech News"/>
 		<outline text="TechCrunch" title="TechCrunch" enabled="true" type="rss" xmlUrl="https://techcrunch.com/feed/" category="Tech News"/>
