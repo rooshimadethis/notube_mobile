@@ -134,13 +134,64 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   Widget _buildFeedItem(FeedItem item) {
+    if (_feedService.isArticleRead(item.link)) {
+      return _buildMiniCard(item);
+    }
+    return _buildStandardCard(item);
+  }
+
+  Widget _buildMiniCard(FeedItem item) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), // Tighter vertical margin
+      color: Colors.white.withValues(alpha: 0.05), // Darker/Grayed out
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), // Smaller radius
+      child: InkWell(
+        onTap: () async {
+           // still navigate if they really want to re-read
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => WebViewScreen(
+                url: item.link,
+                title: item.title,
+              ),
+              fullscreenDialog: true,
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          child: Row(
+            children: [
+              const Icon(Icons.check_circle_outline, size: 16, color: Colors.white24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  item.title,
+                  style: const TextStyle(
+                    color: Colors.white54, // Dim text
+                    fontSize: 14,
+                    fontWeight: FontWeight.normal,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStandardCard(FeedItem item) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: Colors.white.withValues(alpha: 0.1), 
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () async {
-          // Mark as read in background storage
+          // Mark as read
           await _feedService.markArticleAsRead(item.link);
           
           if (!mounted) return;
@@ -156,11 +207,9 @@ class _FeedScreenState extends State<FeedScreen> {
             ),
           );
 
-          // Upon return, remove from the list
+          // Upon return, just trigger a rebuild so the item turns into a mini card
           if (mounted) {
-            setState(() {
-              _items.removeWhere((i) => i.link == item.link);
-            });
+            setState(() {});
           }
         },
         onLongPress: () {

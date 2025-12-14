@@ -165,6 +165,11 @@ class FeedService {
     return sources;
   }
 
+  bool isArticleRead(String url) {
+    if (!_readArticlesLoaded) return false;
+    return _readArticleUrls.contains(url);
+  }
+
   Future<List<FeedItem>> fetchFeeds(List<FeedSource> sources, {bool forceRefresh = false}) async {
     // Ensure read articles are loaded locally
     if (!_readArticlesLoaded) await loadReadArticles();
@@ -209,22 +214,15 @@ class FeedService {
       }
     }
 
-    // 4.5. Filter out read articles
-    // We do this AFTER aggregation but BEFORE sorting to reduce sort/render work
-    final filteredItems = allItems.where((item) {
-      // Check if the link is in our read set
-      return !_readArticleUrls.contains(item.link);
-    }).toList();
-
     // 5. Sort
-    filteredItems.sort((a, b) {
+    allItems.sort((a, b) {
       if (a.publishedDate == null && b.publishedDate == null) return 0;
       if (a.publishedDate == null) return 1;
       if (b.publishedDate == null) return -1;
       return b.publishedDate!.compareTo(a.publishedDate!); // Newest first
     });
     
-    return filteredItems;
+    return allItems;
   }
 
   Future<void> _fetchAndUpdateCache(FeedSource source) async {
