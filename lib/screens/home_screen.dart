@@ -23,7 +23,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<Alternative> _alternatives = [];
   bool _isLoading = true;
   Timer? _debounceTimer;
@@ -33,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadData();
     // Listen to auth changes. If user logs in, this triggers _loadData which handles the sync flow.
     _authSubscription = context.read<AuthService>().user.listen((_) {
@@ -63,10 +64,38 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkGratitudeJournal();
+    }
+  }
+
   Future<void> _checkGratitudeJournal() async {
+    // Only show if HomeScreen is the current top route (don't stack if Settings or Journal already open)
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+
     final prefs = await SharedPreferences.getInstance();
     final show = prefs.getBool('showGratitudeJournal') ?? true;
-    if (show && mounted) {
+    
+    if (!show) return;
+
+    final lastShownMillis = prefs.getInt('lastGratitudeShownTime');
+    final now = DateTime.now();
+    
+    bool shouldShow = false;
+    if (lastShownMillis == null) {
+      shouldShow = true;
+    } else {
+      final lastShown = DateTime.fromMillisecondsSinceEpoch(lastShownMillis);
+      if (now.difference(lastShown).inHours >= 1) {
+        shouldShow = true;
+      }
+    }
+
+    if (shouldShow && mounted) {
+      await prefs.setInt('lastGratitudeShownTime', now.millisecondsSinceEpoch);
+      
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => const GratitudeJournalScreen(),
@@ -78,6 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _authSubscription?.cancel();
     _intentDataStreamSubscription?.cancel();
     _debounceTimer?.cancel();
