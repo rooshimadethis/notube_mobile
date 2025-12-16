@@ -6,11 +6,7 @@ class WebViewScreen extends StatefulWidget {
   final String url;
   final String title;
 
-  const WebViewScreen({
-    super.key,
-    required this.url,
-    required this.title,
-  });
+  const WebViewScreen({super.key, required this.url, required this.title});
 
   @override
   State<WebViewScreen> createState() => _WebViewScreenState();
@@ -31,7 +27,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFF0F172A))
+      ..setBackgroundColor(Colors.white)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) {
@@ -75,8 +71,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
     final host = uri.host;
 
     // 1. Allow if already on archive sites
-    if (host.contains('archive.ph') || 
-        host.contains('archive.is') || 
+    if (host.contains('archive.ph') ||
+        host.contains('archive.is') ||
         host.contains('archive.today') ||
         host.contains('archive.li') ||
         host.contains('archive.vn') ||
@@ -99,8 +95,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
     // 4. Check for common category/section patterns
     final lowerPath = uri.path.toLowerCase();
-    if (lowerPath.contains('/category/') || 
-        lowerPath.contains('/tag/') || 
+    if (lowerPath.contains('/category/') ||
+        lowerPath.contains('/tag/') ||
         lowerPath.contains('/topic/') ||
         lowerPath.contains('/section/') ||
         lowerPath.contains('/author/')) {
@@ -114,14 +110,14 @@ class _WebViewScreenState extends State<WebViewScreen> {
     if (cleanUrl.endsWith('?')) {
       cleanUrl = cleanUrl.substring(0, cleanUrl.length - 1);
     }
-    
+
     final archiveUrl = 'https://archive.ph/$cleanUrl';
     debugPrint('Redirecting to archive: $archiveUrl');
-    
+
     // We must load the new request asynchronously to avoid blocking the delegate
     // and to ensure the current navigation is cancelled first.
     Future.microtask(() => _controller.loadRequest(Uri.parse(archiveUrl)));
-    
+
     return NavigationDecision.prevent;
   }
 
@@ -132,7 +128,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
     final uri = Uri.parse(currentUrl);
     final host = uri.host;
 
-    final isArchive = host.contains('archive.ph') ||
+    final isArchive =
+        host.contains('archive.ph') ||
         host.contains('archive.is') ||
         host.contains('archive.today') ||
         host.contains('archive.li') ||
@@ -189,7 +186,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
             controller: _urlController,
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 8,
+              ),
               filled: true,
               fillColor: Colors.white.withValues(alpha: 0.1),
               border: OutlineInputBorder(
@@ -207,10 +207,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
               if (!url.startsWith('http://') && !url.startsWith('https://')) {
                 if (url.contains('.') && !url.contains(' ')) {
-                   url = 'https://$url';
+                  url = 'https://$url';
                 } else {
-                   // Treat as search query
-                   url = 'https://www.google.com/search?q=${Uri.encodeComponent(url)}';
+                  // Treat as search query
+                  url =
+                      'https://www.google.com/search?q=${Uri.encodeComponent(url)}';
                 }
               }
               _controller.loadRequest(Uri.parse(url));
@@ -230,7 +231,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   if (currentUrl != null) {
                     final uri = Uri.parse(currentUrl);
                     try {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      );
                     } catch (e) {
                       debugPrint('Could not launch $uri: $e');
                     }
@@ -263,9 +267,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
             WebViewWidget(controller: _controller),
             if (_isLoading)
               const Center(
-                child: CircularProgressIndicator(
-                  color: Colors.indigoAccent,
-                ),
+                child: CircularProgressIndicator(color: Colors.indigoAccent),
               ),
           ],
         ),
