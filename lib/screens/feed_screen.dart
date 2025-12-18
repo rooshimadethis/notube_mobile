@@ -27,7 +27,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
   Future<void> _loadFeeds({bool forceRefresh = false}) async {
     if (!mounted) return;
-    
+
     // Only set loading to true initially if we have no items to show
     if (_items.isEmpty) {
       setState(() => _isLoading = true);
@@ -35,39 +35,41 @@ class _FeedScreenState extends State<FeedScreen> {
 
     try {
       final sources = await _feedService.getEnabledFeedSources();
-      
+
       // Listen to the stream
-      _feedService.fetchFeedsStream(sources, forceRefresh: forceRefresh).listen(
-        (items) {
-          if (mounted) {
-            setState(() {
-              _items = items;
-              _isLoading = false; // We have something to show, or at least cache is empty
-            });
-          }
-        },
-        onError: (e) {
-          if (mounted) {
-            // Don't hide existing content on error necessarily, but show snackbar
-             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error updating feeds: $e')),
-            );
-            setState(() => _isLoading = false);
-          }
-        },
-        onDone: () {
-          if (mounted) {
-             setState(() => _isLoading = false);
-          }
-        },
-      );
-      
+      _feedService
+          .fetchFeedsStream(sources, forceRefresh: forceRefresh)
+          .listen(
+            (items) {
+              if (mounted) {
+                setState(() {
+                  _items = items;
+                  _isLoading =
+                      false; // We have something to show, or at least cache is empty
+                });
+              }
+            },
+            onError: (e) {
+              if (mounted) {
+                // Don't hide existing content on error necessarily, but show snackbar
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error updating feeds: $e')),
+                );
+                setState(() => _isLoading = false);
+              }
+            },
+            onDone: () {
+              if (mounted) {
+                setState(() => _isLoading = false);
+              }
+            },
+          );
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error starting feed load: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error starting feed load: $e')));
       }
     }
   }
@@ -81,19 +83,20 @@ class _FeedScreenState extends State<FeedScreen> {
         elevation: 0,
         title: const Text(
           'Scroller',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
             onSelected: (value) {
               if (value == 'sources') {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => const FeedSourceScreen()),
-                ).then((_) => _loadFeeds());
+                Navigator.of(context)
+                    .push(
+                      MaterialPageRoute(
+                        builder: (context) => const FeedSourceScreen(),
+                      ),
+                    )
+                    .then((_) => _loadFeeds());
               }
             },
             itemBuilder: (BuildContext context) {
@@ -159,47 +162,158 @@ class _FeedScreenState extends State<FeedScreen> {
     if (_feedService.isArticleRead(item.link)) {
       return _buildMiniCard(item);
     }
-    return _buildStandardCard(item);
+
+    final swipeBackground = Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.indigoAccent.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.only(left: 20),
+      child: const Text(
+        'MARK AS READ',
+        style: TextStyle(
+          color: Colors.indigoAccent,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+
+    final secondarySwipeBackground = Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.indigoAccent.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.only(right: 20),
+      child: const Text(
+        'MARK AS READ',
+        style: TextStyle(
+          color: Colors.indigoAccent,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+
+    return Dismissible(
+      key: Key(item.link),
+      direction: DismissDirection.horizontal,
+      background: swipeBackground,
+      secondaryBackground: secondarySwipeBackground,
+      onDismissed: (direction) async {
+        await _feedService.markArticleAsRead(item.link);
+        if (mounted) {
+          setState(() {});
+        }
+      },
+      child: _buildStandardCard(item),
+    );
   }
 
   Widget _buildMiniCard(FeedItem item) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), // Tighter vertical margin
-      color: Colors.white.withValues(alpha: 0.05), // Darker/Grayed out
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), // Smaller radius
-      child: InkWell(
-        onTap: () async {
-           // still navigate if they really want to re-read
-          await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => WebViewScreen(
-                url: item.link,
-                title: item.title,
-              ),
-              fullscreenDialog: true,
-            ),
-          );
-        },
+    final undoBackground = Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-          child: Row(
-            children: [
-              const Icon(Icons.check_circle_outline, size: 16, color: Colors.white24),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  item.title,
-                  style: const TextStyle(
-                    color: Colors.white54, // Dim text
-                    fontSize: 14,
-                    fontWeight: FontWeight.normal,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+      ),
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.only(left: 20),
+      child: Text(
+        'MARK AS UNREAD',
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.5),
+          fontWeight: FontWeight.bold,
+          fontSize: 11,
+          letterSpacing: 1.1,
+        ),
+      ),
+    );
+
+    final secondaryUndoBackground = Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.only(right: 20),
+      child: Text(
+        'MARK AS UNREAD',
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.5),
+          fontWeight: FontWeight.bold,
+          fontSize: 11,
+          letterSpacing: 1.1,
+        ),
+      ),
+    );
+
+    return Dismissible(
+      key: Key('mini-${item.link}'),
+      direction: DismissDirection.horizontal,
+      background: undoBackground,
+      secondaryBackground: secondaryUndoBackground,
+      onDismissed: (direction) async {
+        await _feedService.markArticleAsUnread(item.link);
+        if (mounted) {
+          setState(() {});
+        }
+      },
+      child: Card(
+        margin: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 4,
+        ), // Tighter vertical margin
+        color: Colors.white.withValues(alpha: 0.05), // Darker/Grayed out
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ), // Smaller radius
+        child: InkWell(
+          onTap: () async {
+            // still navigate if they really want to re-read
+            await Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) =>
+                    WebViewScreen(url: item.link, title: item.title),
+                fullscreenDialog: true,
               ),
-            ],
+            );
+          },
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 12.0,
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.check_circle_outline,
+                  size: 16,
+                  color: Colors.white24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    item.title,
+                    style: const TextStyle(
+                      color: Colors.white54, // Dim text
+                      fontSize: 14,
+                      fontWeight: FontWeight.normal,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -209,22 +323,20 @@ class _FeedScreenState extends State<FeedScreen> {
   Widget _buildStandardCard(FeedItem item) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Colors.white.withValues(alpha: 0.1), 
+      color: Colors.white.withValues(alpha: 0.1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () async {
           // Mark as read
           await _feedService.markArticleAsRead(item.link);
-          
+
           if (!mounted) return;
 
           // Navigate to WebView
           await Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => WebViewScreen(
-                url: item.link,
-                title: item.title,
-              ),
+              builder: (context) =>
+                  WebViewScreen(url: item.link, title: item.title),
               fullscreenDialog: true,
             ),
           );
@@ -238,30 +350,40 @@ class _FeedScreenState extends State<FeedScreen> {
           showDialog(
             context: context,
             builder: (context) => AlertDialog(
-              backgroundColor: const Color(0xFF1E293B), // Matches card/theme color somewhat
-              title: const Text('Hide Source', style: TextStyle(color: Colors.white)),
+              backgroundColor: const Color(
+                0xFF1E293B,
+              ), // Matches card/theme color somewhat
+              title: const Text(
+                'Hide Source',
+                style: TextStyle(color: Colors.white),
+              ),
               content: Text(
-                'Stop showing articles from "${item.source}"?', 
-                style: const TextStyle(color: Colors.white70)
+                'Stop showing articles from "${item.source}"?',
+                style: const TextStyle(color: Colors.white70),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.white60),
+                  ),
                 ),
                 TextButton(
                   onPressed: () async {
                     // Capture scaffold messenger before async gap
                     final scaffoldMessenger = ScaffoldMessenger.of(context);
                     Navigator.pop(context);
-                    
+
                     await _feedService.disableFeedSource(item.sourceUrl);
-                    
+
                     if (mounted) {
                       setState(() {
-                        _items.removeWhere((i) => i.sourceUrl == item.sourceUrl);
+                        _items.removeWhere(
+                          (i) => i.sourceUrl == item.sourceUrl,
+                        );
                       });
-                      
+
                       scaffoldMessenger.showSnackBar(
                         SnackBar(
                           content: Text('Hidden ${item.source}'),
@@ -276,7 +398,10 @@ class _FeedScreenState extends State<FeedScreen> {
                       );
                     }
                   },
-                  child: const Text('Hide', style: TextStyle(color: Colors.redAccent)),
+                  child: const Text(
+                    'Hide',
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
                 ),
               ],
             ),
@@ -313,10 +438,7 @@ class _FeedScreenState extends State<FeedScreen> {
                     if (item.publishedDate != null)
                       Text(
                         DateFormat.yMMMd().add_jm().format(item.publishedDate!),
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: Colors.grey[400], fontSize: 12),
                       ),
                   ],
                 ),
@@ -329,23 +451,27 @@ class _FeedScreenState extends State<FeedScreen> {
                     imageUrl: item.imageUrl!,
                     width: 68,
                     height: 68,
-                    memCacheWidth: 204, // Optimization: Decode only what we need (68 * 3x pixel density)
+                    memCacheWidth:
+                        204, // Optimization: Decode only what we need (68 * 3x pixel density)
                     memCacheHeight: 204,
                     fit: BoxFit.cover,
                     placeholder: (context, url) => Container(
                       width: 68,
                       height: 68,
                       color: Colors.white.withValues(alpha: 0.05),
-                      child: const Center(child: Icon(Icons.image, color: Colors.grey)),
+                      child: const Center(
+                        child: Icon(Icons.image, color: Colors.grey),
+                      ),
                     ),
-                    errorWidget: (context, url, error) => const SizedBox.shrink(),
+                    errorWidget: (context, url, error) =>
+                        const SizedBox.shrink(),
                     fadeInDuration: const Duration(milliseconds: 300),
                   ),
                 ),
               ] else if (item.sourceIconUrl != null) ...[
-                 // Fallback to source icon if no article image
-                 const SizedBox(width: 16),
-                 ClipRRect(
+                // Fallback to source icon if no article image
+                const SizedBox(width: 16),
+                ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: CachedNetworkImage(
                     imageUrl: item.sourceIconUrl!,
@@ -354,8 +480,10 @@ class _FeedScreenState extends State<FeedScreen> {
                     // Favicons might be small, so we might not want memCacheWidth large or maybe we do to avoid blur if upscaled?
                     // Actually Google Favicons with sz=64 are 64x64. Upscaling 68x68 is fine.
                     fit: BoxFit.contain, // Contain so we don't crop the logo
-                    placeholder: (context, url) => const SizedBox(width: 68, height: 68),
-                    errorWidget: (context, url, error) => const SizedBox.shrink(),
+                    placeholder: (context, url) =>
+                        const SizedBox(width: 68, height: 68),
+                    errorWidget: (context, url, error) =>
+                        const SizedBox.shrink(),
                     fadeInDuration: const Duration(milliseconds: 300),
                   ),
                 ),

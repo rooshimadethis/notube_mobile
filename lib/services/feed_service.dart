@@ -16,8 +16,6 @@ import '../models/feed_item.dart';
 import '../models/feed_source.dart';
 import '../models/feed_cache.dart';
 
-
-
 class FeedService {
   static final FeedService _instance = FeedService._internal();
   factory FeedService() => _instance;
@@ -29,10 +27,10 @@ class FeedService {
 
   // Cache for feed URLs to avoid re-parsing OPML constantly if not needed
   // But for now we just load every time or rely on caller to manage state
-  
+
   static const String _feedPreferencesKey = 'feed_preferences';
   static const String _readArticlesKey = 'read_articles';
-  
+
   // Limit strictly to keep 'markArticleAsRead' fast (disk write on every tap).
   // 2000 is safe because RSS feeds usually rotate content (drop old items)
   // much faster than a user reads 2000 items.
@@ -50,7 +48,7 @@ class FeedService {
 
   Future<void> loadReadArticles() async {
     if (_readArticlesLoaded) return;
-    
+
     final prefs = await SharedPreferences.getInstance();
     final List<String>? saved = prefs.getStringList(_readArticlesKey);
     if (saved != null) {
@@ -61,19 +59,28 @@ class FeedService {
 
   Future<void> markArticleAsRead(String url) async {
     if (!_readArticlesLoaded) await loadReadArticles();
-    
+
     if (_readArticleUrls.contains(url)) return; // Already read
 
     _readArticleUrls.add(url);
-    
+
     // Enforce max history size (FIFO)
-    // LinkedHashSet (Dart's default Set) preserves insertion order.
-    // So the first items are the oldest.
     if (_readArticleUrls.length > _maxReadHistory) {
-      // Create a list to remove the first item safely
       final first = _readArticleUrls.first;
       _readArticleUrls.remove(first);
     }
+
+    // Save to disk
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_readArticlesKey, _readArticleUrls.toList());
+  }
+
+  Future<void> markArticleAsUnread(String url) async {
+    if (!_readArticlesLoaded) await loadReadArticles();
+
+    if (!_readArticleUrls.contains(url)) return; // Already unread
+
+    _readArticleUrls.remove(url);
 
     // Save to disk
     final prefs = await SharedPreferences.getInstance();
@@ -97,7 +104,7 @@ class FeedService {
     final prefs = await SharedPreferences.getInstance();
     final jsonString = prefs.getString(_feedPreferencesKey);
     if (jsonString == null) return {};
-    
+
     try {
       final Map<String, dynamic> jsonMap = jsonDecode(jsonString);
       return jsonMap.map((key, value) => MapEntry(key, value as bool));
@@ -131,10 +138,8 @@ class FeedService {
   Future<List<FeedSource>> getEnabledFeedSources() async {
     final allSources = await loadFeedSources();
     final prefs = await getFeedPreferences();
-    
-    return allSources
-        .where((s) => isFeedEnabled(s, prefs))
-        .toList();
+
+    return allSources.where((s) => isFeedEnabled(s, prefs)).toList();
   }
 
   List<FeedSource> _parseOpml(String opmlContent) {
@@ -142,35 +147,43 @@ class FeedService {
     try {
       final document = XmlDocument.parse(opmlContent);
       final outlines = document.findAllElements('outline');
-      
+
       for (var node in outlines) {
         final type = node.getAttribute('type');
         final xmlUrl = node.getAttribute('xmlUrl');
-        final title = node.getAttribute('title') ?? node.getAttribute('text') ?? 'Unknown Config';
+        final title =
+            node.getAttribute('title') ??
+            node.getAttribute('text') ??
+            'Unknown Config';
         final category = node.getAttribute('category') ?? 'Uncategorized';
         final enabledStr = node.getAttribute('enabled');
-        final isEnabled = enabledStr?.toLowerCase() != 'false'; // Default to true if missing or not false
-        
+        final isEnabled =
+            enabledStr?.toLowerCase() !=
+            'false'; // Default to true if missing or not false
+
         if (type == 'rss' && xmlUrl != null && xmlUrl.isNotEmpty) {
           // Generate favicon URL
           String? iconUrl;
           try {
             final uri = Uri.parse(xmlUrl);
-             // Google Favicon Service: https://www.google.com/s2/favicons?domain=example.com&sz=64
+            // Google Favicon Service: https://www.google.com/s2/favicons?domain=example.com&sz=64
             if (uri.host.isNotEmpty) {
-              iconUrl = 'https://www.google.com/s2/favicons?domain=${uri.host}&sz=64';
+              iconUrl =
+                  'https://www.google.com/s2/favicons?domain=${uri.host}&sz=64';
             }
           } catch (_) {
             // Ignore parse errors, just no icon
           }
 
-          sources.add(FeedSource(
-            title: title, 
-            url: xmlUrl, 
-            category: category,
-            enabled: isEnabled,
-            iconUrl: iconUrl,
-          ));
+          sources.add(
+            FeedSource(
+              title: title,
+              url: xmlUrl,
+              category: category,
+              enabled: isEnabled,
+              iconUrl: iconUrl,
+            ),
+          );
         }
       }
     } catch (e) {
@@ -184,7 +197,10 @@ class FeedService {
     return _readArticleUrls.contains(url);
   }
 
-  Stream<List<FeedItem>> fetchFeedsStream(List<FeedSource> sources, {bool forceRefresh = false}) {
+  Stream<List<FeedItem>> fetchFeedsStream(
+    List<FeedSource> sources, {
+    bool forceRefresh = false,
+  }) {
     final controller = StreamController<List<FeedItem>>();
     // Start fetching without awaiting, so we return the stream immediately
     _startStreamFetching(sources, forceRefresh, controller);
@@ -192,7 +208,10 @@ class FeedService {
   }
 
   Future<void> _startStreamFetching(
-      List<FeedSource> sources, bool forceRefresh, StreamController<List<FeedItem>> controller) async {
+    List<FeedSource> sources,
+    bool forceRefresh,
+    StreamController<List<FeedItem>> controller,
+  ) async {
     try {
       // Ensure read articles are loaded locally
       if (!_readArticlesLoaded) await loadReadArticles();
@@ -215,7 +234,9 @@ class FeedService {
             isCacheValid = true;
             currentItems.addAll(cachedEntry.items);
           } else {
-            developer.log("Cache expired for ${source.title} (Age: ${age.inHours}h)");
+            developer.log(
+              "Cache expired for ${source.title} (Age: ${age.inHours}h)",
+            );
           }
         }
 
@@ -229,7 +250,9 @@ class FeedService {
       // Initial yield: Show what we have in cache immediately
       // Sort first
       _sortItems(currentItems);
-      if (!controller.isClosed) controller.add(List<FeedItem>.from(currentItems));
+      if (!controller.isClosed) {
+        controller.add(List<FeedItem>.from(currentItems));
+      }
 
       if (sourcesToFetch.isEmpty) {
         await controller.close();
@@ -240,30 +263,34 @@ class FeedService {
       // We process each source in parallel. When one finishes, we update the stream.
       // We must guard against controller being closed if widget is disposed.
 
-      await Future.wait(sourcesToFetch.map((source) async {
-        try {
-          await _fetchAndUpdateCache(source);
-          
-          if (controller.isClosed) return;
+      await Future.wait(
+        sourcesToFetch.map((source) async {
+          try {
+            await _fetchAndUpdateCache(source);
 
-          // Re-aggregate everything safely
-          // This is slightly inefficient (O(N*M)) but N (sources) and M (Total items) are small enough (<2000 items)
-          final newItems = <FeedItem>[];
-          for (var s in sources) {
-            if (_cache.containsKey(s.url)) {
-              newItems.addAll(_cache[s.url]!.items);
+            if (controller.isClosed) {
+              return;
             }
-          }
-          _sortItems(newItems);
-          
-          if (!controller.isClosed) {
-            controller.add(newItems);
-          }
-        } catch (e) {
+
+            // Re-aggregate everything safely
+            // This is slightly inefficient (O(N*M)) but N (sources) and M (Total items) are small enough (<2000 items)
+            final newItems = <FeedItem>[];
+            for (var s in sources) {
+              if (_cache.containsKey(s.url)) {
+                newItems.addAll(_cache[s.url]!.items);
+              }
+            }
+            _sortItems(newItems);
+
+            if (!controller.isClosed) {
+              controller.add(newItems);
+            }
+          } catch (e) {
             // Individual feed failure shouldn't kill the whole stream
             developer.log("Error in stream fetch for ${source.url}: $e");
-        }
-      }));
+          }
+        }),
+      );
 
       if (!controller.isClosed) await controller.close();
     } catch (e) {
@@ -271,36 +298,35 @@ class FeedService {
       if (!controller.isClosed) await controller.close();
     }
   }
-    
 
-  
   void _sortItems(List<FeedItem> items) {
     items.sort((a, b) {
       if (a.publishedDate == null && b.publishedDate == null) return 0;
       if (a.publishedDate == null) return 1;
       if (b.publishedDate == null) return -1;
-      return b.publishedDate!.compareTo(a.publishedDate!); 
+      return b.publishedDate!.compareTo(a.publishedDate!);
     });
   }
 
   // Keeping original for backward compatibility or easy migration, but implementing it using the stream or leaving as is?
-  // I will LEAVE existing fetchFeeds as is for safety (or reimplement it to wait for stream last element) 
+  // I will LEAVE existing fetchFeeds as is for safety (or reimplement it to wait for stream last element)
   // and ADD the new one.
-  
-  Future<List<FeedItem>> fetchFeeds(List<FeedSource> sources, {bool forceRefresh = false}) async {
+
+  Future<List<FeedItem>> fetchFeeds(
+    List<FeedSource> sources, {
+    bool forceRefresh = false,
+  }) async {
     // Just wait for the last emission of the stream
     return await fetchFeedsStream(sources, forceRefresh: forceRefresh).last;
   }
 
-
-
   Future<void> _fetchAndUpdateCache(FeedSource source) async {
     final cached = _cache[source.url];
-    
+
     // Perform Conditional GET
     final result = await _fetchFeed(
-      source, 
-      etag: cached?.etag, 
+      source,
+      etag: cached?.etag,
       lastModified: cached?.lastModified,
     );
 
@@ -317,7 +343,9 @@ class FeedService {
       }
     } else if (result.status == FetchStatus.success) {
       // 200: New content!
-      developer.log("⬇️ Fetched New Content: ${source.title} (${result.items.length} items)");
+      developer.log(
+        "⬇️ Fetched New Content: ${source.title} (${result.items.length} items)",
+      );
       if (result.items.isNotEmpty) {
         _cache[source.url] = FeedCacheEntry(
           items: result.items,
@@ -329,12 +357,17 @@ class FeedService {
     }
   }
 
-  Future<FetchResult> _fetchFeed(FeedSource source, {String? etag, String? lastModified}) async {
+  Future<FetchResult> _fetchFeed(
+    FeedSource source, {
+    String? etag,
+    String? lastModified,
+  }) async {
     try {
       final headers = <String, String>{
         'User-Agent':
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept':
+            'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
         'Upgrade-Insecure-Requests': '1',
       };
@@ -342,38 +375,36 @@ class FeedService {
       if (etag != null) headers['If-None-Match'] = etag;
       if (lastModified != null) headers['If-Modified-Since'] = lastModified;
 
-      final response = await _client.get(
-        Uri.parse(source.url),
-        headers: headers,
-      ).timeout(const Duration(seconds: 10));
-      
+      final response = await _client
+          .get(Uri.parse(source.url), headers: headers)
+          .timeout(const Duration(seconds: 10));
+
       if (response.statusCode == 304) {
         return FetchResult.notModified();
       } else if (response.statusCode == 200) {
         final items = await compute(_parseAndFilterFeed, {
-          'xml': response.body, 
+          'xml': response.body,
           'url': source.url,
           'category': source.category,
           'iconUrl': source.iconUrl,
         });
 
         return FetchResult.success(
-          items: items, 
-          etag: response.headers['etag'], 
+          items: items,
+          etag: response.headers['etag'],
           lastModified: response.headers['last-modified'],
         );
       } else {
-        developer.log("Failed to fetch feed ${source.url}: ${response.statusCode}");
+        developer.log(
+          "Failed to fetch feed ${source.url}: ${response.statusCode}",
+        );
       }
     } catch (e) {
       developer.log("Error fetching feed ${source.url}: $e");
     }
     return FetchResult.error();
   }
-
 }
-
-
 
 // Negative keywords that strongly suggest "negative emotion" (Tragedy, Violence, Crime)
 /*
@@ -406,17 +437,16 @@ List<FeedItem> _parseAndFilterFeed(Map<String, dynamic> args) {
   final feedUrl = args['url'] as String;
   final category = args['category'] as String;
   final sourceIconUrl = args['iconUrl'] as String?;
-  
+
   final items = _parseFeedXml(xmlString, feedUrl, category, sourceIconUrl);
-  
+
   // Create ML sentiment analyzer with custom negative words
   // final mlAnalyzer = _createSentimentAnalyzer();
-  
+
   // Filter out negative sentiment
   return items.where((item) {
     final text = "${item.title}. ${item.description}";
 
-    
     try {
       // 1. Check strict keywords first (fast path) - using word boundaries
       // 1. Keyword search DISABLED per user request (relying on ML/AFINN context)
@@ -431,7 +461,7 @@ List<FeedItem> _parseAndFilterFeed(Map<String, dynamic> args) {
         }
       }
       */
-      
+
       // 2. ML disabled per user request
       /*
       // Use ml_sentiment_simple for ML-based analysis (pure Dart, no native deps)
@@ -443,16 +473,18 @@ List<FeedItem> _parseAndFilterFeed(Map<String, dynamic> args) {
         return false;
       }
       */
-      
+
       // 3. Use sentiment_dart (AFINN-165)
       final afinnResult = Sentiment.analysis(text, emoji: true);
-      
+
       // Only filter if AFINN score is significantly negative
       if (afinnResult.score < -2) {
-        developer.log('📊 AFINN FILTERED: "${item.title}" (Score: ${afinnResult.score})');
+        developer.log(
+          '📊 AFINN FILTERED: "${item.title}" (Score: ${afinnResult.score})',
+        );
         return false;
       }
-      
+
       return true; // Keep the article
     } catch (e) {
       // On error, keep the article
@@ -461,16 +493,21 @@ List<FeedItem> _parseAndFilterFeed(Map<String, dynamic> args) {
   }).toList();
 }
 
-List<FeedItem> _parseFeedXml(String xmlString, String feedUrl, String category, String? sourceIconUrl) {
+List<FeedItem> _parseFeedXml(
+  String xmlString,
+  String feedUrl,
+  String category,
+  String? sourceIconUrl,
+) {
   try {
     final document = XmlDocument.parse(xmlString);
-    
+
     // Check for RSS
     final rss = document.findAllElements('rss').firstOrNull;
     if (rss != null) {
       return _parseRss(document, category, feedUrl, sourceIconUrl);
     }
-    
+
     // Check for Atom
     final feed = document.findAllElements('feed').firstOrNull;
     if (feed != null) {
@@ -480,26 +517,38 @@ List<FeedItem> _parseFeedXml(String xmlString, String feedUrl, String category, 
     // RDF/RSS 1.0
     final rdf = document.findAllElements('rdf:RDF').firstOrNull;
     if (rdf != null) {
-       return _parseRss(document, category, feedUrl, sourceIconUrl); // Structure is similar enough mostly
+      return _parseRss(
+        document,
+        category,
+        feedUrl,
+        sourceIconUrl,
+      ); // Structure is similar enough mostly
     }
-    
   } catch (e) {
     developer.log("Error parsing XML for $feedUrl: $e");
   }
   return [];
 }
 
-List<FeedItem> _parseRss(XmlDocument document, String category, String sourceUrl, String? sourceIconUrl) {
+List<FeedItem> _parseRss(
+  XmlDocument document,
+  String category,
+  String sourceUrl,
+  String? sourceIconUrl,
+) {
   final items = <FeedItem>[];
   final channel = document.findAllElements('channel').firstOrNull;
-  final sourceTitle = channel?.findElements('title').firstOrNull?.innerText ?? 'Unknown Source';
+  final sourceTitle =
+      channel?.findElements('title').firstOrNull?.innerText ?? 'Unknown Source';
 
   for (var node in document.findAllElements('item')) {
-    final title = node.findElements('title').firstOrNull?.innerText ?? 'No Title';
+    final title =
+        node.findElements('title').firstOrNull?.innerText ?? 'No Title';
     final link = node.findElements('link').firstOrNull?.innerText ?? '';
-    final description = node.findElements('description').firstOrNull?.innerText ?? '';
+    final description =
+        node.findElements('description').firstOrNull?.innerText ?? '';
     final pubDateStr = node.findElements('pubDate').firstOrNull?.innerText;
-    
+
     DateTime? pubDate;
     if (pubDateStr != null) {
       pubDate = _parseDate(pubDateStr);
@@ -507,7 +556,7 @@ List<FeedItem> _parseRss(XmlDocument document, String category, String sourceUrl
 
     // Try to find image
     String? imageUrl;
-    
+
     // 1. Check enclosure
     final enclosure = node.findElements('enclosure').firstOrNull;
     if (enclosure != null) {
@@ -521,16 +570,17 @@ List<FeedItem> _parseRss(XmlDocument document, String category, String sourceUrl
     if (imageUrl == null) {
       final mediaContents = node.findAllElements('media:content');
       if (mediaContents.isNotEmpty) {
-         // Find one with image medium or type or just verify url
-         final img = mediaContents.firstWhere((e) {
-           final type = e.getAttribute('type');
-           final medium = e.getAttribute('medium');
-           return (type != null && type.startsWith('image/')) || medium == 'image';
-         }, orElse: () => mediaContents.first);
-         imageUrl = img.getAttribute('url');
+        // Find one with image medium or type or just verify url
+        final img = mediaContents.firstWhere((e) {
+          final type = e.getAttribute('type');
+          final medium = e.getAttribute('medium');
+          return (type != null && type.startsWith('image/')) ||
+              medium == 'image';
+        }, orElse: () => mediaContents.first);
+        imageUrl = img.getAttribute('url');
       }
     }
-    
+
     if (imageUrl == null) {
       final thumbnail = node.findAllElements('media:thumbnail').firstOrNull;
       if (thumbnail != null) {
@@ -543,38 +593,49 @@ List<FeedItem> _parseRss(XmlDocument document, String category, String sourceUrl
       final imgRegExp = RegExp(r'<img[^>]+src="([^">]+)"');
       final match = imgRegExp.firstMatch(description);
       if (match != null) {
-         imageUrl = match.group(1);
+        imageUrl = match.group(1);
       }
     }
 
-    items.add(FeedItem(
-      title: _cleanText(title),
-      link: link,
-      description: _cleanText(description),
-      publishedDate: pubDate,
-      source: _cleanText(sourceTitle),
-      sourceUrl: sourceUrl,
-      category: category,
+    items.add(
+      FeedItem(
+        title: _cleanText(title),
+        link: link,
+        description: _cleanText(description),
+        publishedDate: pubDate,
+        source: _cleanText(sourceTitle),
+        sourceUrl: sourceUrl,
+        category: category,
 
-      imageUrl: imageUrl,
-      sourceIconUrl: sourceIconUrl,
-    ));
+        imageUrl: imageUrl,
+        sourceIconUrl: sourceIconUrl,
+      ),
+    );
   }
   return items;
 }
 
-List<FeedItem> _parseAtom(XmlDocument document, String category, String sourceUrl, String? sourceIconUrl) {
+List<FeedItem> _parseAtom(
+  XmlDocument document,
+  String category,
+  String sourceUrl,
+  String? sourceIconUrl,
+) {
   final items = <FeedItem>[];
-  final feedTitle = document.findAllElements('title').firstOrNull?.innerText ?? 'Unknown Source';
+  final feedTitle =
+      document.findAllElements('title').firstOrNull?.innerText ??
+      'Unknown Source';
 
   for (var node in document.findAllElements('entry')) {
-    final title = node.findElements('title').firstOrNull?.innerText ?? 'No Title';
-    
+    final title =
+        node.findElements('title').firstOrNull?.innerText ?? 'No Title';
+
     // Atom links are attributes usually
     String link = '';
     final links = node.findElements('link');
     final altLink = links.firstWhere(
-      (e) => e.getAttribute('rel') == 'alternate' || e.getAttribute('rel') == null,
+      (e) =>
+          e.getAttribute('rel') == 'alternate' || e.getAttribute('rel') == null,
       orElse: () => links.first,
     );
     link = altLink.getAttribute('href') ?? '';
@@ -582,10 +643,10 @@ List<FeedItem> _parseAtom(XmlDocument document, String category, String sourceUr
     final summary = node.findElements('summary').firstOrNull?.innerText ?? '';
     final content = node.findElements('content').firstOrNull?.innerText ?? '';
     final description = summary.isNotEmpty ? summary : content;
-    
+
     final updatedStr = node.findElements('updated').firstOrNull?.innerText;
     final publishedStr = node.findElements('published').firstOrNull?.innerText;
-    
+
     DateTime? pubDate;
     if (publishedStr != null) {
       pubDate = DateTime.tryParse(publishedStr);
@@ -595,10 +656,12 @@ List<FeedItem> _parseAtom(XmlDocument document, String category, String sourceUr
 
     // Atom Image extraction
     String? imageUrl;
-    
+
     // 1. enclosure link
     final enclosureLink = links.firstWhere(
-      (e) => e.getAttribute('rel') == 'enclosure' && (e.getAttribute('type')?.startsWith('image/') ?? false),
+      (e) =>
+          e.getAttribute('rel') == 'enclosure' &&
+          (e.getAttribute('type')?.startsWith('image/') ?? false),
       orElse: () => XmlElement(XmlName('dummy')),
     );
     if (enclosureLink.name.local != 'dummy') {
@@ -608,39 +671,41 @@ List<FeedItem> _parseAtom(XmlDocument document, String category, String sourceUr
     // 2. media:content
     if (imageUrl == null) {
       final mediaContents = node.findAllElements('media:content');
-       if (mediaContents.isNotEmpty) {
-         imageUrl = mediaContents.first.getAttribute('url');
+      if (mediaContents.isNotEmpty) {
+        imageUrl = mediaContents.first.getAttribute('url');
       }
     }
-    
+
     if (imageUrl == null) {
       final thumbnail = node.findAllElements('media:thumbnail').firstOrNull;
       if (thumbnail != null) {
         imageUrl = thumbnail.getAttribute('url');
       }
     }
-    
+
     // 3. Description/Content regex
     if (imageUrl == null && description.isNotEmpty) {
       final imgRegExp = RegExp(r'<img[^>]+src="([^">]+)"');
       final match = imgRegExp.firstMatch(description);
       if (match != null) {
-         imageUrl = match.group(1);
+        imageUrl = match.group(1);
       }
     }
 
-    items.add(FeedItem(
-      title: _cleanText(title),
-      link: link,
-      description: _cleanText(description),
-      publishedDate: pubDate,
-      source: _cleanText(feedTitle),
-      sourceUrl: sourceUrl,
-      category: category,
+    items.add(
+      FeedItem(
+        title: _cleanText(title),
+        link: link,
+        description: _cleanText(description),
+        publishedDate: pubDate,
+        source: _cleanText(feedTitle),
+        sourceUrl: sourceUrl,
+        category: category,
 
-      imageUrl: imageUrl,
-      sourceIconUrl: sourceIconUrl,
-    ));
+        imageUrl: imageUrl,
+        sourceIconUrl: sourceIconUrl,
+      ),
+    );
   }
   return items;
 }
@@ -650,16 +715,16 @@ DateTime? _parseDate(String dateStr) {
   try {
     return HttpDate.parse(dateStr);
   } catch (_) {}
-  
+
   // Try parsing with Intl if needed, or simple DateFormat
   // Most RSS feeds use RFC822: "Mon, 25 Dec 2023 12:00:00 GMT"
   // Dart's HttpDate handles this.
-  
+
   // Sometimes it's ISO8601
   try {
     return DateTime.parse(dateStr);
   } catch (_) {}
-  
+
   return null;
 }
 
@@ -668,7 +733,3 @@ String _cleanText(String text) {
   // For now return as is or minimal cleanup
   return text.replaceAll(RegExp(r'<[^>]*>'), '').trim();
 }
-
-
-
-
