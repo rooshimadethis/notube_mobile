@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
@@ -25,7 +26,7 @@ Future<({Uri url, http.StreamedResponse response})> requestFeedUrl(
         !const {301, 302, 303, 307, 308}.contains(response.statusCode)) {
       return (url: url, response: response);
     }
-    await response.stream.drain<void>();
+    await response.stream.listen(null).cancel();
 
     // Resolve each hop so relative feed and article links use the final page URL.
     final target = url.resolve(location);
@@ -129,14 +130,18 @@ class FeedDiscovery {
     try {
       final root = XmlDocument.parse(page.body).rootElement;
       final XmlElement? feed = switch (root.name.local) {
-        'rss' || 'RDF' => root.findElements('channel').firstOrNull,
+        'rss' ||
+        'RDF' => root.findElements('channel', namespace: '*').firstOrNull,
         'feed' => root,
         _ => null,
       };
       if (feed == null) return null;
       if (requireArticles &&
           root
-              .findAllElements(root.name.local == 'feed' ? 'entry' : 'item')
+              .findAllElements(
+                root.name.local == 'feed' ? 'entry' : 'item',
+                namespace: '*',
+              )
               .isEmpty) {
         return null;
       }
@@ -163,12 +168,38 @@ Future<({Uri url, String body})?> readFeedPage(
   Duration timeout = const Duration(seconds: 8),
   bool Function(Uri)? allowRedirect,
 }) async {
+  final result = await readFeedResponse(
+    client,
+    address,
+    maxBytes: maxBytes,
+    timeout: timeout,
+    allowRedirect: allowRedirect,
+    headers: const {
+      'Accept':
+          'application/atom+xml,application/rss+xml,text/html,application/xml,*/*;q=0.8',
+    },
+  );
+  if (result == null || result.response.statusCode != 200) return null;
+  return (
+    url: result.url.removeFragment(),
+    body: utf8.decode(result.response.bodyBytes, allowMalformed: true),
+  );
+}
+
+Future<({Uri url, http.Response response})?> readFeedResponse(
+  http.Client client,
+  Uri address, {
+  required Duration timeout,
+  required int maxBytes,
+  Map<String, String> headers = const {},
+  bool Function(Uri)? allowRedirect,
+}) async {
   final abort = Completer<void>();
   void cancel() {
     if (!abort.isCompleted) abort.complete();
   }
 
-  // Bound the whole request, including redirects and response body downloads.
+  // Bound the whole transfer, including redirect bodies and decompressed bytes.
   final deadline = Timer(timeout, cancel);
   try {
     final (:url, :response) = await requestFeedUrl(
@@ -176,26 +207,27 @@ Future<({Uri url, String body})?> readFeedPage(
       address,
       abortTrigger: abort.future,
       allowRedirect: allowRedirect,
-      headers: const {
-        'Accept':
-            'application/atom+xml,application/rss+xml,text/html,application/xml,*/*;q=0.8',
-      },
+      headers: headers,
     );
-    if (response.statusCode != 200) {
-      cancel();
-      return null;
-    }
-    final bytes = <int>[];
-    await for (final chunk in response.stream) {
-      if (bytes.length + chunk.length > maxBytes) {
-        cancel();
-        return null;
+    final bytes = BytesBuilder(copy: false);
+    if (response.statusCode == 200) {
+      await for (final chunk in response.stream) {
+        if (bytes.length + chunk.length > maxBytes) {
+          cancel();
+          return null;
+        }
+        bytes.add(chunk);
       }
-      bytes.addAll(chunk);
+    } else {
+      await response.stream.listen(null).cancel();
     }
     return (
-      url: url.removeFragment(),
-      body: utf8.decode(bytes, allowMalformed: true),
+      url: url,
+      response: http.Response.bytes(
+        bytes.takeBytes(),
+        response.statusCode,
+        headers: response.headers,
+      ),
     );
   } on Exception {
     return null;

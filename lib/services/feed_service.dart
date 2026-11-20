@@ -21,9 +21,12 @@ import 'small_web_discovery.dart';
 class FeedService {
   static final FeedService _instance = FeedService._internal();
   factory FeedService() => _instance;
-  FeedService._internal();
+  FeedService._internal() : _client = http.Client();
 
-  final http.Client _client = http.Client();
+  @visibleForTesting
+  FeedService.withClient(this._client);
+
+  final http.Client _client;
   late final _smallWeb = SmallWebDiscovery(_client);
   // final SentimentAiService _aiService = SentimentAiService(); // Disabled
   // bool _aiInitialized = false; // Disabled
@@ -48,6 +51,7 @@ class FeedService {
 
   // Cache for feed items: URL -> Cache Entry
   final Map<String, FeedCacheEntry> _cache = {};
+  final Map<String, Future<void>> _pendingFetches = {};
 
   final Set<String> _readArticleUrls = {};
   bool _readArticlesLoaded = false;
@@ -296,87 +300,55 @@ class FeedService {
     StreamController<List<FeedItem>> controller,
   ) async {
     try {
-      // Ensure read articles are loaded locally
-      if (!_readArticlesLoaded) await loadReadArticles();
+      await loadReadArticles();
 
-      // Aggregate only the requested URLs. Older refreshes may still be using
-      // other cache entries while the user changes source preferences.
-      final currentItems = <FeedItem>[];
-      final List<FeedSource> sourcesToFetch = [];
+      List<FeedItem> cachedItems() {
+        final items = [
+          for (final source in sources) ...?_cache[source.url]?.items,
+        ];
+        _sortItems(items);
+        return items;
+      }
 
-      for (var source in sources) {
-        final cachedEntry = _cache[source.url];
-
-        bool isCacheValid = false;
-        if (cachedEntry != null) {
-          final age = DateTime.now().difference(cachedEntry.timestamp);
-          if (age < _cacheTtl) {
-            isCacheValid = true;
-            currentItems.addAll(cachedEntry.items);
-          } else {
-            developer.log(
-              "Cache expired for ${source.title} (Age: ${age.inHours}h)",
-            );
+      // Display stale entries during revalidation and keep them on failure.
+      controller.add(cachedItems());
+      final results = await Future.wait(
+        sources.map((source) async {
+          final cached = _cache[source.url];
+          if (!forceRefresh &&
+              cached != null &&
+              DateTime.now().difference(cached.timestamp) < _cacheTtl) {
+            return true;
           }
-        }
-
-        if (forceRefresh || !isCacheValid) {
-          sourcesToFetch.add(source);
-        } else if (cachedEntry != null) {
-          // Keep existing items if valid
-        }
-      }
-
-      // Initial yield: Show what we have in cache immediately
-      // Sort first
-      _sortItems(currentItems);
-      if (!controller.isClosed) {
-        controller.add(List<FeedItem>.from(currentItems));
-      }
-
-      if (sourcesToFetch.isEmpty) {
-        await controller.close();
-        return;
-      }
-
-      // Parallel fetching.
-      // We process each source in parallel. When one finishes, we update the stream.
-      // We must guard against controller being closed if widget is disposed.
-
-      await Future.wait(
-        sourcesToFetch.map((source) async {
           try {
-            await _fetchAndUpdateCache(source);
-
-            if (controller.isClosed) {
-              return;
-            }
-
-            // Re-aggregate everything safely
-            // This is slightly inefficient (O(N*M)) but N (sources) and M (Total items) are small enough (<2000 items)
-            final newItems = <FeedItem>[];
-            for (var s in sources) {
-              if (_cache.containsKey(s.url)) {
-                newItems.addAll(_cache[s.url]!.items);
-              }
-            }
-            _sortItems(newItems);
-
-            if (!controller.isClosed) {
-              controller.add(newItems);
-            }
-          } catch (e) {
-            // Individual feed failure shouldn't kill the whole stream
-            developer.log("Error in stream fetch for ${source.url}: $e");
+            await _refreshSource(source);
+            if (!controller.isClosed) controller.add(cachedItems());
+            return true;
+          } catch (error) {
+            developer.log('Error refreshing ${source.title}: $error');
+            return _cache.containsKey(source.url);
           }
         }),
       );
 
-      if (!controller.isClosed) await controller.close();
-    } catch (e) {
-      if (!controller.isClosed) controller.addError(e);
+      if (results.isNotEmpty && !results.contains(true)) {
+        throw StateError('Couldn’t load any followed feeds.');
+      }
+    } catch (error, stack) {
+      if (!controller.isClosed) controller.addError(error, stack);
+    } finally {
       if (!controller.isClosed) await controller.close();
     }
+  }
+
+  Future<void> _refreshSource(FeedSource source) {
+    // An overlapping check must not replace newer items using old validators.
+    return _pendingFetches.putIfAbsent(
+      source.url,
+      () => _fetchAndUpdateCache(source).whenComplete(() {
+        _pendingFetches.remove(source.url);
+      }),
+    );
   }
 
   void _sortItems(List<FeedItem> items) {
@@ -388,52 +360,36 @@ class FeedService {
     });
   }
 
-  // Keeping original for backward compatibility or easy migration, but implementing it using the stream or leaving as is?
-  // I will LEAVE existing fetchFeeds as is for safety (or reimplement it to wait for stream last element)
-  // and ADD the new one.
-
   Future<List<FeedItem>> fetchFeeds(
     List<FeedSource> sources, {
     bool forceRefresh = false,
-  }) async {
-    // Just wait for the last emission of the stream
-    return await fetchFeedsStream(sources, forceRefresh: forceRefresh).last;
-  }
+  }) => fetchFeedsStream(sources, forceRefresh: forceRefresh).last;
 
   Future<void> _fetchAndUpdateCache(FeedSource source) async {
     final cached = _cache[source.url];
-
-    // Perform Conditional GET
     final result = await _fetchFeed(
       source,
       etag: cached?.etag,
       lastModified: cached?.lastModified,
     );
 
-    if (result.status == FetchStatus.notModified) {
-      // 304: Server says our cache is still good. Just update timestamp.
-      developer.log("✅ 304 Not Modified: ${source.title}");
-      if (cached != null) {
-        _cache[source.url] = FeedCacheEntry(
-          items: cached.items, // Keep old items
-          timestamp: DateTime.now(),
-          etag: cached.etag, // Keep old headers
-          lastModified: cached.lastModified,
-        );
-      }
-    } else if (result.status == FetchStatus.success) {
-      // 200: New content!
-      developer.log(
-        "⬇️ Fetched New Content: ${source.title} (${result.items.length} items)",
+    if (result.status == FetchStatus.notModified && cached != null) {
+      _cache[source.url] = FeedCacheEntry(
+        items: cached.items,
+        timestamp: DateTime.now(),
+        etag: cached.etag,
+        lastModified: cached.lastModified,
       );
-      if (result.items.isNotEmpty) {
-        _cache[source.url] = FeedCacheEntry(
-          items: result.items,
-          timestamp: DateTime.now(),
-          etag: result.etag,
-          lastModified: result.lastModified,
-        );
-      }
+    } else if (result.status == FetchStatus.success) {
+      // A valid but empty feed must clear articles from the previous version.
+      _cache[source.url] = FeedCacheEntry(
+        items: result.items,
+        timestamp: DateTime.now(),
+        etag: result.etag,
+        lastModified: result.lastModified,
+      );
+    } else {
+      throw StateError('No usable response for ${source.title}.');
     }
   }
 
@@ -455,11 +411,15 @@ class FeedService {
       if (etag != null) headers['If-None-Match'] = etag;
       if (lastModified != null) headers['If-Modified-Since'] = lastModified;
 
-      final address = Uri.parse(source.url);
-      final (baseUrl, response) = await (() async {
-        final fetch = await requestFeedUrl(_client, address, headers: headers);
-        return (fetch.url, await http.Response.fromStream(fetch.response));
-      })().timeout(const Duration(seconds: 10));
+      final fetch = await readFeedResponse(
+        _client,
+        Uri.parse(source.url),
+        headers: headers,
+        timeout: const Duration(seconds: 10),
+        maxBytes: 8 * 1024 * 1024,
+      );
+      if (fetch == null) return FetchResult.error();
+      final (url: baseUrl, :response) = fetch;
 
       if (response.statusCode == 304) {
         return FetchResult.notModified();
@@ -600,61 +560,40 @@ List<FeedItem> _parseFeedXml(
   String category,
   String? sourceIconUrl,
 ) {
-  try {
-    final document = XmlDocument.parse(xmlString);
-
-    // Check for RSS
-    final rss = document.findAllElements('rss').firstOrNull;
-    if (rss != null) {
-      return _parseRss(document, category, feedUrl, baseUrl, sourceIconUrl);
-    }
-
-    // Check for Atom
-    final feed = document.findAllElements('feed').firstOrNull;
-    if (feed != null) {
-      return _parseAtom(document, category, feedUrl, baseUrl, sourceIconUrl);
-    }
-
-    // RDF/RSS 1.0
-    final rdf = document.findAllElements('rdf:RDF').firstOrNull;
-    if (rdf != null) {
-      return _parseRss(
-        document,
-        category,
-        feedUrl,
-        baseUrl,
-        sourceIconUrl,
-      ); // Structure is similar enough mostly
-    }
-  } catch (e) {
-    developer.log("Error parsing XML for $feedUrl: $e");
-  }
-  return [];
+  final root = XmlDocument.parse(xmlString).rootElement;
+  return switch (root.name.local) {
+    'rss' || 'RDF'
+        when root.findElements('channel', namespace: '*').firstOrNull != null =>
+      _parseRss(root, category, feedUrl, baseUrl, sourceIconUrl),
+    'feed' => _parseAtom(root, category, feedUrl, baseUrl, sourceIconUrl),
+    _ => throw const FormatException('Response does not contain a feed.'),
+  };
 }
 
+XmlElement? _child(XmlElement element, String name) =>
+    element.findElements(name, namespace: element.namespaceUri).firstOrNull;
+
 List<FeedItem> _parseRss(
-  XmlDocument document,
+  XmlElement root,
   String category,
   String sourceUrl,
   Uri baseUrl,
   String? sourceIconUrl,
 ) {
   final items = <FeedItem>[];
-  final channel = document.findAllElements('channel').firstOrNull;
-  final sourceTitle =
-      channel?.findElements('title').firstOrNull?.innerText ?? 'Unknown Source';
+  final channel = root.findElements('channel', namespace: '*').firstOrNull!;
+  final sourceTitle = _child(channel, 'title')?.innerText ?? 'Unknown Source';
 
-  for (var node in document.findAllElements('item')) {
-    final title =
-        node.findElements('title').firstOrNull?.innerText ?? 'No Title';
-    final link = _articleUrl(
-      baseUrl,
-      node.findElements('link').firstOrNull?.innerText,
-    );
+  final itemsParent = root.name.local == 'RDF' ? root : channel;
+  for (final node in itemsParent.findElements(
+    'item',
+    namespace: channel.namespaceUri,
+  )) {
+    final title = _child(node, 'title')?.innerText ?? 'No Title';
+    final link = _articleUrl(baseUrl, _child(node, 'link')?.innerText);
     if (link == null) continue;
-    final description =
-        node.findElements('description').firstOrNull?.innerText ?? '';
-    final pubDateStr = node.findElements('pubDate').firstOrNull?.innerText;
+    final description = _child(node, 'description')?.innerText ?? '';
+    final pubDateStr = _child(node, 'pubDate')?.innerText;
 
     DateTime? pubDate;
     if (pubDateStr != null) {
@@ -665,7 +604,7 @@ List<FeedItem> _parseRss(
     String? imageUrl;
 
     // 1. Check enclosure
-    final enclosure = node.findElements('enclosure').firstOrNull;
+    final enclosure = _child(node, 'enclosure');
     if (enclosure != null) {
       final type = enclosure.getAttribute('type');
       if (type != null && type.startsWith('image/')) {
@@ -714,7 +653,7 @@ List<FeedItem> _parseRss(
         sourceUrl: sourceUrl,
         category: category,
 
-        imageUrl: imageUrl,
+        imageUrl: _articleUrl(baseUrl, imageUrl),
         sourceIconUrl: sourceIconUrl,
       ),
     );
@@ -723,23 +662,20 @@ List<FeedItem> _parseRss(
 }
 
 List<FeedItem> _parseAtom(
-  XmlDocument document,
+  XmlElement root,
   String category,
   String sourceUrl,
   Uri baseUrl,
   String? sourceIconUrl,
 ) {
   final items = <FeedItem>[];
-  final feedTitle =
-      document.findAllElements('title').firstOrNull?.innerText ??
-      'Unknown Source';
+  final feedTitle = _child(root, 'title')?.innerText ?? 'Unknown Source';
 
-  for (var node in document.findAllElements('entry')) {
-    final title =
-        node.findElements('title').firstOrNull?.innerText ?? 'No Title';
+  for (final node in root.findElements('entry', namespace: root.namespaceUri)) {
+    final title = _child(node, 'title')?.innerText ?? 'No Title';
 
     // Atom links are attributes usually
-    final links = node.findElements('link');
+    final links = node.findElements('link', namespace: node.namespaceUri);
     final altLink = links.where((element) {
       final rel = element.getAttribute('rel');
       return rel == null || rel == 'alternate';
@@ -747,12 +683,12 @@ List<FeedItem> _parseAtom(
     final link = _articleUrl(baseUrl, altLink?.getAttribute('href'));
     if (link == null) continue;
 
-    final summary = node.findElements('summary').firstOrNull?.innerText ?? '';
-    final content = node.findElements('content').firstOrNull?.innerText ?? '';
+    final summary = _child(node, 'summary')?.innerText ?? '';
+    final content = _child(node, 'content')?.innerText ?? '';
     final description = summary.isNotEmpty ? summary : content;
 
-    final updatedStr = node.findElements('updated').firstOrNull?.innerText;
-    final publishedStr = node.findElements('published').firstOrNull?.innerText;
+    final updatedStr = _child(node, 'updated')?.innerText;
+    final publishedStr = _child(node, 'published')?.innerText;
 
     DateTime? pubDate;
     if (publishedStr != null) {
@@ -808,7 +744,7 @@ List<FeedItem> _parseAtom(
         sourceUrl: sourceUrl,
         category: category,
 
-        imageUrl: imageUrl,
+        imageUrl: _articleUrl(baseUrl, imageUrl),
         sourceIconUrl: sourceIconUrl,
       ),
     );

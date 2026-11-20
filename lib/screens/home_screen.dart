@@ -28,6 +28,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<Alternative> _alternatives = [];
   bool _isLoading = true;
+  int _loadRevision = 0;
   Timer? _debounceTimer;
   StreamSubscription? _authSubscription;
   StreamSubscription? _intentDataStreamSubscription;
@@ -36,8 +37,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _loadData();
-    // Listen to auth changes. If user logs in, this triggers _loadData which handles the sync flow.
+    // The auth stream emits the initial state as well as subsequent changes.
     _authSubscription = context.read<AuthService>().user.listen((_) {
       _loadData();
     });
@@ -134,128 +134,82 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _loadData() async {
     if (!mounted) return;
+    final revision = ++_loadRevision;
+    final auth = context.read<AuthService>();
+    final userId = auth.currentUser?.uid;
+    // An older account's response must not update this screen or its local copy.
+    bool isCurrentLoad() =>
+        mounted &&
+        revision == _loadRevision &&
+        auth.currentUser?.uid == userId;
+
     setState(() => _isLoading = true);
-
     try {
-      // 1. Get local/default items
-      List<Alternative> currentItems = await _getLocalAlternatives();
-      
-      if (mounted) {
-        setState(() => _alternatives = currentItems);
-      }
+      final local = await _getLocalAlternatives();
+      if (!mounted || !isCurrentLoad()) return;
+      setState(() => _alternatives = local);
+      if (userId == null) return;
 
-      // 2. If logged in, initiate sync flow (Push local if cloud empty, or prompt user)
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser != null && mounted) {
-        try {
-          final firestoreService = context.read<FirestoreService>();
-          final cloudItems = await firestoreService
-              .getUserAlternatives(currentUser.uid)
-              .timeout(const Duration(seconds: 5));
+      final firestore = context.read<FirestoreService>();
+      final prefs = await SharedPreferences.getInstance();
+      var cloud = await firestore
+          .getUserAlternatives(userId)
+          .timeout(const Duration(seconds: 5));
+      if (!isCurrentLoad()) return;
 
-          final prefs = await SharedPreferences.getInstance();
-          final lastSyncedUserId = prefs.getString('lastSyncedUserId');
-          final isFirstSync = lastSyncedUserId != currentUser.uid;
-
-          if (mounted) {
-            if (cloudItems.isEmpty) {
-              // Case 1: Cloud is empty -> Push local items to cloud automatically
-              await firestoreService.saveUserAlternatives(currentUser.uid, currentItems);
-              await prefs.setString('lastSyncedUserId', currentUser.uid);
-              developer.log("Pushed local items to empty cloud");
-            } else if (isFirstSync && !_areAlternativesEqual(currentItems, cloudItems)) {
-              // Case 2: First time sync with conflict -> Show Dialog
-              await _showSyncDialog(currentItems, cloudItems, firestoreService, currentUser.uid);
-            } else {
-              // Case 3: Subsequent sync or identical -> Use cloud
-              developer.log("Auto-syncing from cloud (isFirstSync: $isFirstSync)");
-              _setAlternativesFromLoad(cloudItems);
-              await prefs.setString('lastSyncedUserId', currentUser.uid);
-            }
-          }
-        } catch (e) {
-          developer.log("Firestore load failed (or timed out): $e");
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to sync with cloud. Using local data.')),
-            );
-          }
+      // An explicitly empty cloud list represents a real deletion.
+      cloud ??= await firestore.initializeUserAlternatives(userId, local);
+      if (!isCurrentLoad()) return;
+      if (prefs.getString('lastSyncedUserId') != userId &&
+          !_areAlternativesEqual(local, cloud)) {
+        final merge = await _showSyncDialog();
+        if (!isCurrentLoad() || merge == null) return;
+        if (merge) {
+          cloud = await firestore.mergeUserAlternatives(userId, local);
         }
       }
-      
-      if (mounted) setState(() => _isLoading = false);
+      if (!isCurrentLoad()) return;
 
-    } catch (e) {
-      developer.log("Critical error in _loadData: $e");
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-
-
-  Future<void> _showSyncDialog(
-    List<Alternative> local,
-    List<Alternative> cloud,
-    FirestoreService firestoreService,
-    String userId,
-  ) async {
-    // If lists are identical, no need to ask - just ensure local is synced
-    if (_areAlternativesEqual(local, cloud)) {
-      developer.log("Local and cloud are already in sync, no dialog needed");
-      _setAlternativesFromLoad(cloud); // Ensure local storage is updated
-      final prefs = await SharedPreferences.getInstance();
+      final synced = cloud;
+      await _saveToLocal(synced, failOnError: true, preferences: prefs);
+      if (!isCurrentLoad()) return;
+      setState(() => _alternatives = synced);
       await prefs.setString('lastSyncedUserId', userId);
-      return;
+    } catch (error) {
+      developer.log('Saved-site load failed: $error');
+      if (mounted && isCurrentLoad()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to sync with cloud. Using local data.')),
+        );
+      }
+    } finally {
+      if (isCurrentLoad()) setState(() => _isLoading = false);
     }
-    
-    await showDialog(
-      context: context,
-      barrierDismissible: false, // Force choice
-      builder: (context) => AlertDialog(
-        title: const Text('Sync Conflict'),
-        content: const Text(
-          'Cloud data found. How would you like to proceed?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              // Overwrite Local: Use cloud items
-              _setAlternativesFromLoad(cloud);
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setString('lastSyncedUserId', userId);
-            },
-            child: Text('Use cloud data', style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              // Merge: Cloud wins conflicts, new local items added
-              final merged = firestoreService.mergeAlternatives(local, cloud);
-              _setAlternativesFromLoad(merged);
-              // Save merged back to cloud
-              await firestoreService.saveUserAlternatives(userId, merged);
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setString('lastSyncedUserId', userId);
-            },
-            child: const Text('Merge cloud and local data'),
-          ),
-        ],
-      ),
-    );
   }
 
-  /// Sets alternatives from initial load without triggering cloud save
-  void _setAlternativesFromLoad(List<Alternative> newItems) {
-    if (!mounted) return;
-    
-    setState(() {
-      _alternatives = newItems;
-    });
-    
-    // Save to local storage (Source of truth for offline/not logged in)
-    _saveToLocal(newItems);
-  }
+  Future<bool?> _showSyncDialog() => showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      title: const Text('Sync Conflict'),
+      content: const Text(
+        'Cloud data found. How would you like to proceed?',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(
+            'Use cloud data',
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Merge cloud and local data'),
+        ),
+      ],
+    ),
+  );
 
   Future<List<Alternative>> _getLocalAlternatives() async {
     try {
@@ -265,12 +219,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (localData != null) {
         try {
           final decoded = jsonDecode(localData);
-          if (decoded is List && decoded.isNotEmpty) {
-             final items = decoded.map((e) => Alternative()..mergeFromProto3Json(e)).toList();
-             if (items.isNotEmpty) {
-               developer.log("Loaded ${items.length} items from local storage");
-               return items;
-             }
+          if (decoded is List) {
+            return decoded
+                .map((e) => Alternative()..mergeFromProto3Json(e))
+                .toList();
           }
         } catch (e) {
           developer.log("Error parsing local cached data: $e");
@@ -304,15 +256,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return [];
   }
 
-  Future<void> _saveToLocal(List<Alternative> items) async {
+  Future<void> _saveToLocal(
+    List<Alternative> items, {
+    bool failOnError = false,
+    SharedPreferences? preferences,
+  }) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = preferences ?? await SharedPreferences.getInstance();
       // Use custom map conversion to ensure field names (not proto tags)
       final String encoded = jsonEncode(items.map(_alternativeToMap).toList());
-      await prefs.setString('localItems', encoded);
+      if (!await prefs.setString('localItems', encoded)) {
+        throw StateError('Couldn’t save local sites.');
+      }
       developer.log("Saved ${items.length} items to local storage");
     } catch (e) {
       developer.log("Error saving to local: $e");
+      if (failOnError) rethrow;
     }
   }
 

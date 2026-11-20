@@ -5,41 +5,46 @@ import 'package:notube_shared/alternative.pb.dart';
 class FirestoreService {
   FirebaseFirestore get _db => FirebaseFirestore.instance;
 
-  Future<List<Alternative>> getUserAlternatives(String userId) async {
-    try {
-      DocumentSnapshot doc = await _db.collection('users').doc(userId).get();
-
-      if (doc.exists && doc.data() != null) {
-        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-        if (data.containsKey('alternatives')) {
-          List<dynamic> alts = data['alternatives'];
-          final parsed = alts.map((e) => Alternative()..mergeFromProto3Json(e)).toList();
-          developer.log("Fetched ${parsed.length} alternatives from Firestore for user $userId");
-          return parsed;
-        }
-      }
-      developer.log("No alternatives found for user $userId");
-      return [];
-    } catch (e) {
-      developer.log("Error fetching alternatives: $e");
-      rethrow;
-    }
+  Future<List<Alternative>?> getUserAlternatives(String userId) async {
+    final doc = await _db.collection('users').doc(userId).get();
+    return _readAlternatives(doc);
   }
 
-  Future<void> saveUserAlternatives(
-      String userId, List<Alternative> alternatives) async {
-    try {
-      // Convert to Map explicitly to ensure field names are strings (not proto tags)
-      final altsData = alternatives.map(_alternativeToMap).toList();
-      
-      await _db.collection('users').doc(userId).set({
-        'alternatives': altsData,
+  List<Alternative>? _readAlternatives(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final stored = doc.data()?['alternatives'] as List<dynamic>?;
+    return stored?.map((e) => Alternative()..mergeFromProto3Json(e)).toList();
+  }
+
+  Future<List<Alternative>> initializeUserAlternatives(
+    String userId,
+    List<Alternative> local,
+  ) => _updateAlternatives(userId, local, merge: false);
+
+  Future<List<Alternative>> mergeUserAlternatives(
+    String userId,
+    List<Alternative> local,
+  ) => _updateAlternatives(userId, local, merge: true);
+
+  Future<List<Alternative>> _updateAlternatives(
+    String userId,
+    List<Alternative> local, {
+    required bool merge,
+  }) {
+    final doc = _db.collection('users').doc(userId);
+    // Another device can write after the initial load or while the dialog is open.
+    return _db.runTransaction((transaction) async {
+      final cloud = _readAlternatives(await transaction.get(doc));
+      if (cloud != null && !merge) return cloud;
+
+      final updated = cloud == null ? local : mergeAlternatives(local, cloud);
+      transaction.set(doc, {
+        'alternatives': updated.map(_alternativeToMap).toList(),
         'lastUpdated': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-    } catch (e) {
-      developer.log("Error saving alternatives: $e");
-      rethrow;
-    }
+      return updated;
+    });
   }
 
   /// Merges local and cloud alternatives.
@@ -47,7 +52,9 @@ class FirestoreService {
   /// Cloud items take precedence for conflicts (same URL/Title).
   /// Local items are added only if they are not present in the cloud list.
   List<Alternative> mergeAlternatives(
-      List<Alternative> local, List<Alternative> cloud) {
+    List<Alternative> local,
+    List<Alternative> cloud,
+  ) {
     final Map<String, Alternative> mergedMap = {};
 
     // 1. Add all cloud items (they win conflicts)
@@ -65,9 +72,9 @@ class FirestoreService {
     for (var item in local) {
       final key = item.url.isNotEmpty ? item.url : item.title;
       if (key.isNotEmpty) {
-         if (!mergedMap.containsKey(key)) {
-           mergedMap[key] = item;
-         }
+        if (!mergedMap.containsKey(key)) {
+          mergedMap[key] = item;
+        }
       }
       // If local item has no identifier, we skip it to avoid duplicates/garbage
     }
@@ -78,7 +85,9 @@ class FirestoreService {
   Future<void> removeAlternative(String userId, Alternative alternative) async {
     try {
       await _db.collection('users').doc(userId).update({
-        'alternatives': FieldValue.arrayRemove([_alternativeToMap(alternative)])
+        'alternatives': FieldValue.arrayRemove([
+          _alternativeToMap(alternative),
+        ]),
       });
       developer.log("Removed alternative from Firestore for user $userId");
     } catch (e) {
