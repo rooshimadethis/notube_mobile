@@ -6,8 +6,6 @@ import '../services/feed_service.dart';
 import '../widgets/feed_article_card.dart';
 import 'webview_screen.dart';
 
-const _background = Color(0xFF0F172A);
-
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({
     super.key,
@@ -132,8 +130,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Text(
         title,
-        style: const TextStyle(
-          color: Color(0xFFAFC8F5),
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.primary,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -148,7 +146,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         final source = sources[index];
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
-          color: const Color(0xFF1B263B),
           child: ListTile(
             title: Text(source.title),
             subtitle: Text(source.category),
@@ -162,56 +159,49 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: ThemeData.dark(useMaterial3: true),
-      child: Scaffold(
-        backgroundColor: _background,
-        appBar: AppBar(
-          backgroundColor: _background,
-          title: const Text('Discover'),
-        ),
-        body: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: TextField(
-                onChanged: (query) =>
-                    setState(() => _query = query.trim().toLowerCase()),
-                decoration: const InputDecoration(
-                  hintText: 'Search publishers or topics',
-                  prefixIcon: Icon(Icons.search),
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
+    return Scaffold(
+      appBar: AppBar(title: const Text('Discover')),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: TextField(
+              onChanged: (query) =>
+                  setState(() => _query = query.trim().toLowerCase()),
+              decoration: const InputDecoration(
+                hintText: 'Search publishers or topics',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+                isDense: true,
               ),
             ),
-            Expanded(
-              child: FutureBuilder<List<FeedSource>>(
-                future: _catalog,
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: TextButton(
-                        onPressed: () =>
-                            setState(() => _catalog = _loadCatalog()),
-                        child: const Text('Couldn’t load publishers. Retry'),
-                      ),
-                    );
-                  }
-                  final sources = snapshot.data;
-                  if (sources == null) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  return FutureBuilder<List<FeedSource>>(
-                    future: _smallWeb,
-                    builder: (context, smallWeb) =>
-                        _publisherList(catalog: sources, smallWeb: smallWeb),
+          ),
+          Expanded(
+            child: FutureBuilder<List<FeedSource>>(
+              future: _catalog,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: TextButton(
+                      onPressed: () =>
+                          setState(() => _catalog = _loadCatalog()),
+                      child: const Text('Couldn’t load publishers. Retry'),
+                    ),
                   );
-                },
-              ),
+                }
+                final sources = snapshot.data;
+                if (sources == null) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                return FutureBuilder<List<FeedSource>>(
+                  future: _smallWeb,
+                  builder: (context, smallWeb) =>
+                      _publisherList(catalog: sources, smallWeb: smallWeb),
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -290,69 +280,61 @@ class _SourcePreviewState extends State<_SourcePreview> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: !_saving,
-      child: Theme(
-        data: ThemeData.dark(useMaterial3: true),
-        child: Scaffold(
-          backgroundColor: _background,
-          appBar: AppBar(
-            backgroundColor: _background,
-            title: Text(widget.source.title),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: FilledButton.tonal(
-                  onPressed: _following || _saving ? null : _follow,
-                  child: Text(
-                    _following
-                        ? 'Following'
-                        : _saving
-                        ? 'Saving…'
-                        : 'Follow',
-                  ),
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(widget.source.title),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: FilledButton.tonal(
+                onPressed: _following || _saving ? null : _follow,
+                child: Text(
+                  _following
+                      ? 'Following'
+                      : _saving
+                      ? 'Saving…'
+                      : 'Follow',
                 ),
               ),
-            ],
-          ),
-          body: FutureBuilder<List<FeedItem>>(
-            future: _articles,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting &&
-                  !snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final articles = snapshot.data ?? [];
-              if (articles.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('No articles available right now.'),
-                      TextButton(
-                        onPressed: _refresh,
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                );
-              }
-              return RefreshIndicator(
-                onRefresh: _refresh,
-                child: ListView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
-                  itemCount: articles.length,
-                  itemBuilder: (context, index) {
-                    final item = articles[index];
-                    return FeedArticleCard(
-                      item: item,
-                      showSource: false,
-                      onOpen: () => _open(item),
-                    );
-                  },
+            ),
+          ],
+        ),
+        body: FutureBuilder<List<FeedItem>>(
+          future: _articles,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting &&
+                !snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final articles = snapshot.data ?? [];
+            if (articles.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('No articles available right now.'),
+                    TextButton(onPressed: _refresh, child: const Text('Retry')),
+                  ],
                 ),
               );
-            },
-          ),
+            }
+            return RefreshIndicator(
+              onRefresh: _refresh,
+              child: ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
+                itemCount: articles.length,
+                itemBuilder: (context, index) {
+                  final item = articles[index];
+                  return FeedArticleCard(
+                    item: item,
+                    showSource: false,
+                    onOpen: () => _open(item),
+                  );
+                },
+              ),
+            );
+          },
         ),
       ),
     );

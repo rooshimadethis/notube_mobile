@@ -5,6 +5,7 @@ import '../services/feed_service.dart';
 import '../services/reading_list.dart';
 import '../widgets/feed_article_card.dart';
 import 'feed_source_screen.dart';
+import 'settings_screen.dart';
 import 'webview_screen.dart';
 
 class FeedScreen extends StatefulWidget {
@@ -22,6 +23,8 @@ class FeedScreen extends StatefulWidget {
 }
 
 enum _ArticleAction { hide, toggleRead }
+
+enum _ReadAction { switchView, settings }
 
 class _FeedScreenState extends State<FeedScreen> {
   final _feedService = FeedService();
@@ -175,37 +178,45 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   Widget build(BuildContext context) {
     final items = _showAll ? _articles : _readingList;
-    return Theme(
-      data: ThemeData.dark(useMaterial3: true),
-      child: Scaffold(
-        backgroundColor: const Color(0xFF0F172A),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF0F172A),
-          title: Text(_showAll ? 'All articles' : 'Reading list'),
-          actions: [
-            IconButton(
-              tooltip: 'Sources',
-              icon: const Icon(Icons.rss_feed),
-              onPressed: _openSources,
-            ),
-            PopupMenuButton<bool>(
-              onSelected: (showAll) => setState(() => _showAll = showAll),
-              itemBuilder: (_) => [
-                PopupMenuItem(
-                  value: !_showAll,
-                  child: Text(_showAll ? 'Reading list' : 'All articles'),
-                ),
-              ],
-            ),
-          ],
-        ),
-        body: _loading && items.isEmpty
-            ? const Center(child: CircularProgressIndicator())
-            : RefreshIndicator(
-                onRefresh: () => _load(refresh: true),
-                child: items.isEmpty ? _emptyList() : _articleList(items),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_showAll ? 'All articles' : 'Reading list'),
+        actions: [
+          IconButton(
+            tooltip: 'Sources',
+            icon: const Icon(Icons.rss_feed),
+            onPressed: _openSources,
+          ),
+          PopupMenuButton<_ReadAction>(
+            onSelected: (action) {
+              switch (action) {
+                case _ReadAction.switchView:
+                  setState(() => _showAll = !_showAll);
+                case _ReadAction.settings:
+                  Navigator.of(context).push<void>(
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: _ReadAction.switchView,
+                child: Text(_showAll ? 'Reading list' : 'All articles'),
               ),
+              const PopupMenuItem(
+                value: _ReadAction.settings,
+                child: Text('Settings'),
+              ),
+            ],
+          ),
+        ],
       ),
+      body: _loading && items.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: () => _load(refresh: true),
+              child: items.isEmpty ? _emptyList() : _articleList(items),
+            ),
     );
   }
 
@@ -258,9 +269,11 @@ class _FeedScreenState extends State<FeedScreen> {
                       icon: const Icon(Icons.expand_more),
                       label: const Text('More picks'),
                     )
-                  : const Text(
+                  : Text(
                       'End of the reading list',
-                      style: TextStyle(color: Colors.white60),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
             ),
           );
@@ -274,7 +287,7 @@ class _FeedScreenState extends State<FeedScreen> {
             return false;
           },
           background: ColoredBox(
-            color: const Color(0xFF25324B),
+            color: Theme.of(context).colorScheme.surfaceContainerHigh,
             child: Center(
               child: Text(read ? 'Mark as unread' : 'Mark as read'),
             ),

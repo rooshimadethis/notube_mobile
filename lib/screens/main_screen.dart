@@ -20,7 +20,6 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
       body: IndexedStack(
         index: _selectedIndex,
         children: [
@@ -37,9 +36,6 @@ class _MainScreenState extends State<MainScreen> {
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color(0xFF1E293B),
-        selectedItemColor: Colors.indigoAccent,
-        unselectedItemColor: Colors.grey,
         currentIndex: _selectedIndex,
         onTap: (index) {
           setState(() {

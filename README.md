@@ -11,6 +11,7 @@
 - **Reading list** opens with up to 12 mixed picks from RSS and Atom feeds. Use **More picks** for another batch or **All articles** for the full timeline from followed sources.
 - **Discover** lets you browse unfollowed publishers from the bundled OPML catalog, preview their articles, and follow them to add their posts to **Read**. **Sources → Add source** accepts a direct feed or a website that advertises its feeds. Sources and article read history are stored on the device.
 - The [Kagi Small Web directory](https://github.com/kagisearch/smallweb) supplies a daily batch of up to five independent publishers in **Discover**. NoTube checks the feeds and keeps the last batch available offline.
+- NoTube defaults to a high-contrast light theme. The **Dark mode** switch in **Settings** saves the choice on the device.
 - **Gratitude Journal** is a toggleable prompt on the **Saved sites** tab.
 
 ## 🛠️ Implementation Highlights

@@ -81,23 +81,18 @@ class _FeedSourceScreenState extends State<FeedSourceScreen> {
     // The reading screen reloads on return, so let the source write finish first.
     return PopScope(
       canPop: !_saving,
-      child: Theme(
-        data: ThemeData.dark(useMaterial3: true),
-        child: Scaffold(
-          backgroundColor: const Color(0xFF0F172A),
-          appBar: AppBar(
-            backgroundColor: const Color(0xFF0F172A),
-            title: const Text('Sources'),
-            actions: [
-              TextButton.icon(
-                onPressed: _saving ? null : _addSource,
-                icon: const Icon(Icons.add),
-                label: const Text('Add source'),
-              ),
-            ],
-          ),
-          body: _buildSources(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Sources'),
+          actions: [
+            TextButton.icon(
+              onPressed: _saving ? null : _addSource,
+              icon: const Icon(Icons.add),
+              label: const Text('Add source'),
+            ),
+          ],
         ),
+        body: _buildSources(),
       ),
     );
   }
@@ -169,8 +164,8 @@ class _FeedSourceScreenState extends State<FeedSourceScreen> {
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 4),
       child: Text(
         title,
-        style: const TextStyle(
-          color: Color(0xFFAFC8F5),
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.primary,
           fontWeight: FontWeight.w600,
         ),
       ),

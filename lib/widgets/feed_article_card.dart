@@ -21,9 +21,9 @@ class FeedArticleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      color: const Color(0xFF1B263B),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onOpen,
@@ -41,8 +41,8 @@ class FeedArticleCard extends StatelessWidget {
                         '${item.source} · ${item.category}',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFFAFC8F5),
+                        style: TextStyle(
+                          color: colors.primary,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -52,7 +52,9 @@ class FeedArticleCard extends StatelessWidget {
                     Text(
                       item.title,
                       style: TextStyle(
-                        color: read ? Colors.white60 : Colors.white,
+                        color: read
+                            ? colors.onSurfaceVariant
+                            : colors.onSurface,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
@@ -63,8 +65,8 @@ class FeedArticleCard extends StatelessWidget {
                         item.description,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white70,
+                        style: TextStyle(
+                          color: colors.onSurfaceVariant,
                           fontSize: 13,
                         ),
                       ),

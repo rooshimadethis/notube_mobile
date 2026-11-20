@@ -212,11 +212,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       context: context,
       barrierDismissible: false, // Force choice
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text('Sync Conflict', style: TextStyle(color: Colors.white)),
+        title: const Text('Sync Conflict'),
         content: const Text(
           'Cloud data found. How would you like to proceed?',
-          style: TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
@@ -227,7 +225,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               final prefs = await SharedPreferences.getInstance();
               await prefs.setString('lastSyncedUserId', userId);
             },
-            child: const Text('Use cloud data', style: TextStyle(color: Colors.redAccent)),
+            child: Text('Use cloud data', style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -240,8 +238,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               final prefs = await SharedPreferences.getInstance();
               await prefs.setString('lastSyncedUserId', userId);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.indigoAccent),
-            child: const Text('Merge cloud and local data', style: TextStyle(color: Colors.white)),
+            child: const Text('Merge cloud and local data'),
           ),
         ],
       ),
@@ -346,20 +343,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text('Delete Alternative?', style: TextStyle(color: Colors.white)),
+        title: const Text('Delete Alternative?'),
         content: Text(
           'Are you sure you want to delete "${alt.title}"?',
-          style: const TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+            child: Text('Delete', style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],
       ),
@@ -473,20 +468,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final user = context.watch<User?>();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A), // Slate 900
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
         title: const Text(
           'NoTube',
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: Colors.white,
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings, color: Colors.white),
+            icon: const Icon(Icons.settings),
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const SettingsScreen()),
@@ -495,7 +486,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
           if (user != null)
             IconButton(
-              icon: const Icon(Icons.logout, color: Colors.white),
+              icon: const Icon(Icons.logout),
               onPressed: () {
                 context.read<AuthService>().signOut();
                 setState(() {
@@ -511,7 +502,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
                 );
               },
-              child: const Text('Sign In', style: TextStyle(color: Colors.indigoAccent)),
+              child: const Text('Sign In'),
             ),
         ],
       ),
@@ -524,7 +515,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     children: [
                       const Text(
                         'No alternatives found.',
-                        style: TextStyle(color: Colors.white),
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton(
@@ -548,8 +538,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddDialog,
-        backgroundColor: Colors.indigoAccent,
-        child: const Icon(Icons.add, color: Colors.white),
+        child: const Icon(Icons.add),
       ),
     );
   }

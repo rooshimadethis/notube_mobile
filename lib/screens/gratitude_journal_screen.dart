@@ -18,8 +18,8 @@ class _GratitudeJournalScreenState extends State<GratitudeJournalScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
       body: SafeArea(
         child: Stack(
           children: [
@@ -27,7 +27,7 @@ class _GratitudeJournalScreenState extends State<GratitudeJournalScreen> {
               top: 8,
               left: 8,
               child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white),
+                icon: const Icon(Icons.close),
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ),
@@ -39,22 +39,16 @@ class _GratitudeJournalScreenState extends State<GratitudeJournalScreen> {
                 children: [
                   const Text(
                     'Gratitude Journal',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 48),
                   TextField(
                     controller: _controller,
-                    style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       hintText: "I'm grateful for...",
-                      hintStyle: const TextStyle(color: Colors.white54),
                       filled: true,
-                      fillColor: const Color(0xFF1E293B),
+                      fillColor: colors.surfaceContainer,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
@@ -64,13 +58,12 @@ class _GratitudeJournalScreenState extends State<GratitudeJournalScreen> {
                     maxLines: 5,
                   ),
                   const SizedBox(height: 32),
-                  ElevatedButton(
+                  FilledButton(
                     onPressed: () {
                       // No need to save, just close
                       Navigator.of(context).pop();
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.indigoAccent,
+                    style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -81,7 +74,6 @@ class _GratitudeJournalScreenState extends State<GratitudeJournalScreen> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
                       ),
                     ),
                   ),

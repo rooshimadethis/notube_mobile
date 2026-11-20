@@ -166,6 +166,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
@@ -179,25 +180,21 @@ class _WebViewScreenState extends State<WebViewScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF0F172A),
         appBar: AppBar(
-          backgroundColor: const Color(0xFF0F172A),
           title: TextField(
             controller: _urlController,
-            style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 8,
               ),
               filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.1),
+              fillColor: colors.surfaceContainer,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
                 borderSide: BorderSide.none,
               ),
               hintText: 'Search or enter URL',
-              hintStyle: TextStyle(color: Colors.grey[400]),
             ),
             keyboardType: TextInputType.url,
             textInputAction: TextInputAction.go,
@@ -218,13 +215,12 @@ class _WebViewScreenState extends State<WebViewScreen> {
             },
           ),
           leading: IconButton(
-            icon: const Icon(Icons.close, color: Colors.white),
+            icon: const Icon(Icons.close),
             onPressed: () => Navigator.of(context).pop(),
           ),
           actions: [
             PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, color: Colors.white),
-              color: const Color(0xFF1E293B),
+              icon: const Icon(Icons.more_vert),
               onSelected: (value) async {
                 if (value == 'open_external') {
                   final currentUrl = await _controller.currentUrl();
@@ -246,17 +242,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
               itemBuilder: (context) => [
                 const PopupMenuItem(
                   value: 'open_external',
-                  child: Text(
-                    'Open in external browser',
-                    style: TextStyle(color: Colors.white),
-                  ),
+                  child: Text('Open in external browser'),
                 ),
                 const PopupMenuItem(
                   value: 'toggle_archive',
-                  child: Text(
-                    'Toggle archive link',
-                    style: TextStyle(color: Colors.white),
-                  ),
+                  child: Text('Toggle archive link'),
                 ),
               ],
             ),
@@ -265,10 +255,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
         body: Stack(
           children: [
             WebViewWidget(controller: _controller),
-            if (_isLoading)
-              const Center(
-                child: CircularProgressIndicator(color: Colors.indigoAccent),
-              ),
+            if (_isLoading) const Center(child: CircularProgressIndicator()),
           ],
         ),
       ),

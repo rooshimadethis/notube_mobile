@@ -23,9 +23,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await context.read<AuthService>().signInWithEmailAndPassword(
-            _emailController.text.trim(),
-            _passwordController.text.trim(),
-          );
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
+      );
       if (mounted) {
         Navigator.pop(context);
       }
@@ -68,13 +68,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A), // Slate 900
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
+      appBar: AppBar(),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
@@ -83,65 +79,46 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             const Text(
               'Welcome Back',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 48),
             TextField(
               controller: _emailController,
-              style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 labelText: 'Email',
-                labelStyle: TextStyle(color: Colors.grey[400]),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.grey[700]!),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: const BorderSide(color: Colors.indigo),
+                border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.05),
+                fillColor: colors.surfaceContainerLow,
               ),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _passwordController,
               obscureText: true,
-              style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 labelText: 'Password',
-                labelStyle: TextStyle(color: Colors.grey[400]),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.grey[700]!),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: const BorderSide(color: Colors.indigo),
+                border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.05),
+                fillColor: colors.surfaceContainerLow,
               ),
             ),
             if (_errorMessage != null) ...[
               const SizedBox(height: 16),
               Text(
                 _errorMessage!,
-                style: const TextStyle(color: Colors.red),
+                style: TextStyle(color: colors.error),
                 textAlign: TextAlign.center,
               ),
             ],
             const SizedBox(height: 32),
-            ElevatedButton(
+            FilledButton(
               onPressed: _isLoading ? null : _signIn,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo,
+              style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -151,22 +128,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   ? const SizedBox(
                       height: 20,
                       width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Text(
                       'Sign In',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
+            OutlinedButton(
               onPressed: _isLoading ? null : _signInWithGoogle,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: Colors.black87,
+              style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),

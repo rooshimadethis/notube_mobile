@@ -18,10 +18,8 @@ class AlternativeCard extends StatelessWidget {
     if (alternative.bypassPaywall) {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (context) => WebViewScreen(
-            url: alternative.url,
-            title: alternative.title,
-          ),
+          builder: (context) =>
+              WebViewScreen(url: alternative.url, title: alternative.title),
           fullscreenDialog: true,
         ),
       );
@@ -35,11 +33,10 @@ class AlternativeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: Colors.white.withValues(alpha: 0.1),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _launchUrl(context),
         onLongPress: onLongPress,
@@ -49,7 +46,7 @@ class AlternativeCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildIcon(alternative.category),
+              _buildIcon(alternative.category, colors),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -60,7 +57,6 @@ class AlternativeCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -68,7 +64,7 @@ class AlternativeCard extends StatelessWidget {
                       alternative.description,
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey[400],
+                        color: colors.onSurfaceVariant,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -76,7 +72,11 @@ class AlternativeCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: colors.onSurfaceVariant,
+              ),
             ],
           ),
         ),
@@ -84,37 +84,32 @@ class AlternativeCard extends StatelessWidget {
     );
   }
 
-  Widget _buildIcon(String category) {
+  Widget _buildIcon(String category, ColorScheme colors) {
     IconData iconData;
-    Color color;
 
     switch (category) {
       case 'custom':
         iconData = Icons.star;
-        color = Colors.yellow;
         break;
       case 'photography':
         iconData = Icons.camera_alt;
-        color = Colors.indigoAccent;
         break;
       case 'books':
         iconData = Icons.book;
-        color = Colors.indigoAccent;
         break;
       case 'software':
       default:
         iconData = Icons.computer;
-        color = Colors.indigoAccent;
         break;
     }
 
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
+        color: colors.secondaryContainer,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Icon(iconData, color: color, size: 24),
+      child: Icon(iconData, color: colors.onSecondaryContainer, size: 24),
     );
   }
 }
