@@ -3,16 +3,18 @@ class FeedSource {
   final String url;
   final String category;
   final bool enabled;
+  final bool suggested;
   final String? iconUrl;
-  
+
   const FeedSource({
-    required this.title, 
+    required this.title,
     required this.url,
     required this.category,
     this.enabled = true,
+    this.suggested = false,
     this.iconUrl,
   });
-  
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||

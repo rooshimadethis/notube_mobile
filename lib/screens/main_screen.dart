@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'home_screen.dart';
+
+import 'discover_screen.dart';
 import 'feed_screen.dart';
+import 'home_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -11,11 +13,9 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-  
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const FeedScreen(),
-  ];
+  int _sourceRevision = 0;
+
+  void _sourcesChanged() => setState(() => _sourceRevision++);
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +23,18 @@ class _MainScreenState extends State<MainScreen> {
       backgroundColor: const Color(0xFF0F172A),
       body: IndexedStack(
         index: _selectedIndex,
-        children: _screens,
+        children: [
+          FeedScreen(
+            sourceRevision: _sourceRevision,
+            onSourcesChanged: _sourcesChanged,
+          ),
+          DiscoverScreen(
+            isActive: _selectedIndex == 1,
+            sourceRevision: _sourceRevision,
+            onSourcesChanged: _sourcesChanged,
+          ),
+          HomeScreen(isActive: _selectedIndex == 2),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: const Color(0xFF1E293B),
@@ -37,12 +48,16 @@ class _MainScreenState extends State<MainScreen> {
         },
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
+            icon: Icon(Icons.menu_book_outlined),
+            label: 'Read',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.rss_feed),
-            label: 'Scroller',
+            icon: Icon(Icons.explore_outlined),
+            label: 'Discover',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.bookmarks_outlined),
+            label: 'Saved sites',
           ),
         ],
       ),

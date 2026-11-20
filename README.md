@@ -8,7 +8,10 @@
 - **AI‑generated descriptions** for custom sites via a Cloudflare worker (Groq API).
 - **Robust sync logic** using Firestore transactions to avoid race conditions.
 - **Shared library (`notube_shared`)** provides common models and default alternatives.
-- **Gratitude Journal**: A simple, toggleable journal screen on app launch to encourage positive reflection.
+- **Reading list** opens with up to 12 mixed picks from RSS and Atom feeds. Use **More picks** for another batch or **All articles** for the full timeline from followed sources.
+- **Discover** lets you browse unfollowed publishers from the bundled OPML catalog, preview their articles, and follow them to add their posts to **Read**. **Sources → Add source** accepts a direct feed or a website that advertises its feeds. Sources and article read history are stored on the device.
+- The [Kagi Small Web directory](https://github.com/kagisearch/smallweb) supplies a daily batch of up to five independent publishers in **Discover**. NoTube checks the feeds and keeps the last batch available offline.
+- **Gratitude Journal** is a toggleable prompt on the **Saved sites** tab.
 
 ## 🛠️ Implementation Highlights
 

@@ -1,496 +1,309 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import '../services/feed_service.dart';
+
 import '../models/feed_item.dart';
+import '../services/feed_service.dart';
+import '../services/reading_list.dart';
+import '../widgets/feed_article_card.dart';
+import 'feed_source_screen.dart';
 import 'webview_screen.dart';
 
-import 'feed_source_screen.dart';
-
 class FeedScreen extends StatefulWidget {
-  const FeedScreen({super.key});
+  const FeedScreen({
+    super.key,
+    required this.sourceRevision,
+    required this.onSourcesChanged,
+  });
+
+  final int sourceRevision;
+  final VoidCallback onSourcesChanged;
 
   @override
   State<FeedScreen> createState() => _FeedScreenState();
 }
 
+enum _ArticleAction { hide, toggleRead }
+
 class _FeedScreenState extends State<FeedScreen> {
-  final FeedService _feedService = FeedService();
-  List<FeedItem> _items = [];
-  bool _isLoading = true;
+  final _feedService = FeedService();
+  List<FeedItem> _articles = [];
+  List<FeedItem> _readingList = [];
+  bool _loading = true;
+  bool _showAll = false;
+  bool _failed = false;
+  int _refreshId = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadFeeds();
+    _load();
   }
 
-  Future<void> _loadFeeds({bool forceRefresh = false}) async {
+  @override
+  void didUpdateWidget(covariant FeedScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.sourceRevision != oldWidget.sourceRevision) _load();
+  }
+
+  Future<void> _load({bool refresh = false}) async {
     if (!mounted) return;
-
-    // Only set loading to true initially if we have no items to show
-    if (_items.isEmpty) {
-      setState(() => _isLoading = true);
-    }
-
+    final refreshId = ++_refreshId;
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
     try {
-      final sources = await _feedService.getEnabledFeedSources();
-
-      // Listen to the stream
-      _feedService
-          .fetchFeedsStream(sources, forceRefresh: forceRefresh)
-          .listen(
-            (items) {
-              if (mounted) {
-                setState(() {
-                  _items = items;
-                  _isLoading =
-                      false; // We have something to show, or at least cache is empty
-                });
-              }
-            },
-            onError: (e) {
-              if (mounted) {
-                // Don't hide existing content on error necessarily, but show snackbar
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error updating feeds: $e')),
-                );
-                setState(() => _isLoading = false);
-              }
-            },
-            onDone: () {
-              if (mounted) {
-                setState(() => _isLoading = false);
-              }
-            },
-          );
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error starting feed load: $e')));
+      final sources = await _feedService.loadFeedSources();
+      final preferences = await _feedService.getFeedPreferences();
+      final followed = sources.where(
+        (source) => _feedService.isFeedEnabled(source, preferences),
+      );
+      final articles = await _feedService.fetchFeeds(
+        followed.toList(),
+        forceRefresh: refresh,
+      );
+      // A source change can start a new refresh before the previous one finishes.
+      if (!mounted || refreshId != _refreshId) return;
+      final seen = <String>{};
+      setState(() {
+        _articles = articles.where((item) => seen.add(item.link)).toList();
+        _readingList = [];
+        _readingList = _nextPicks();
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted || refreshId != _refreshId) return;
+      setState(() {
+        _loading = false;
+        _failed = true;
+      });
+      if (_articles.isNotEmpty || _readingList.isNotEmpty) {
+        _notify('Couldn’t refresh the reading list.');
       }
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text(
-          'Scroller',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: Colors.white),
-            onSelected: (value) {
-              if (value == 'sources') {
-                Navigator.of(context)
-                    .push(
-                      MaterialPageRoute(
-                        builder: (context) => const FeedSourceScreen(),
-                      ),
-                    )
-                    .then((_) => _loadFeeds());
-              }
-            },
-            itemBuilder: (BuildContext context) {
-              return [
-                const PopupMenuItem<String>(
-                  value: 'sources',
-                  child: Text('Choose sources'),
-                ),
-              ];
-            },
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: () => _loadFeeds(forceRefresh: true),
-              child: _items.isEmpty
-                  ? Center(
-                      child: SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text(
-                              'No articles found.',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _loadFeeds,
-                              child: const Text('Retry'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: _items.length + 1,
-                      itemBuilder: (context, index) {
-                        if (index == 0) {
-                          return Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                            child: Text(
-                              '${_items.length} ARTICLES AVAILABLE',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.6),
-                                fontSize: 13,
-                                letterSpacing: 1.2,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          );
-                        }
-                        return _buildFeedItem(_items[index - 1]);
-                      },
-                    ),
-            ),
+  List<FeedItem> _nextPicks() {
+    final shown = _readingList.map((item) => item.link).toSet();
+    return buildReadingList(
+      _articles,
+      isRead: (link) =>
+          shown.contains(link) || _feedService.isArticleRead(link),
+      now: DateTime.now(),
     );
   }
 
-  Widget _buildFeedItem(FeedItem item) {
-    if (_feedService.isArticleRead(item.link)) {
-      return _buildMiniCard(item);
+  Future<void> _openSources() async {
+    var changed = false;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => FeedSourceScreen(onChanged: () => changed = true),
+      ),
+    );
+    if (changed && mounted) widget.onSourcesChanged();
+  }
+
+  Future<void> _openArticle(FeedItem item) async {
+    final reading = Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => WebViewScreen(url: item.link, title: item.title),
+        fullscreenDialog: true,
+      ),
+    );
+    if (!_feedService.isArticleRead(item.link)) {
+      await _actOnArticle(item, _ArticleAction.toggleRead);
     }
-
-    final swipeBackground = Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.indigoAccent.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      alignment: Alignment.centerLeft,
-      padding: const EdgeInsets.only(left: 20),
-      child: const Text(
-        'MARK AS READ',
-        style: TextStyle(
-          color: Colors.indigoAccent,
-          fontWeight: FontWeight.bold,
-          fontSize: 12,
-          letterSpacing: 1.2,
-        ),
-      ),
-    );
-
-    final secondarySwipeBackground = Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.indigoAccent.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.only(right: 20),
-      child: const Text(
-        'MARK AS READ',
-        style: TextStyle(
-          color: Colors.indigoAccent,
-          fontWeight: FontWeight.bold,
-          fontSize: 12,
-          letterSpacing: 1.2,
-        ),
-      ),
-    );
-
-    return Dismissible(
-      key: Key(item.link),
-      direction: DismissDirection.horizontal,
-      background: swipeBackground,
-      secondaryBackground: secondarySwipeBackground,
-      onDismissed: (direction) async {
-        await _feedService.markArticleAsRead(item.link);
-        if (mounted) {
-          setState(() {});
-        }
-      },
-      child: _buildStandardCard(item),
-    );
+    await reading;
   }
 
-  Widget _buildMiniCard(FeedItem item) {
-    final undoBackground = Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      alignment: Alignment.centerLeft,
-      padding: const EdgeInsets.only(left: 20),
-      child: Text(
-        'MARK AS UNREAD',
-        style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.5),
-          fontWeight: FontWeight.bold,
-          fontSize: 11,
-          letterSpacing: 1.1,
-        ),
-      ),
-    );
-
-    final secondaryUndoBackground = Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.only(right: 20),
-      child: Text(
-        'MARK AS UNREAD',
-        style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.5),
-          fontWeight: FontWeight.bold,
-          fontSize: 11,
-          letterSpacing: 1.1,
-        ),
-      ),
-    );
-
-    return Dismissible(
-      key: Key('mini-${item.link}'),
-      direction: DismissDirection.horizontal,
-      background: undoBackground,
-      secondaryBackground: secondaryUndoBackground,
-      onDismissed: (direction) async {
-        await _feedService.markArticleAsUnread(item.link);
-        if (mounted) {
-          setState(() {});
-        }
-      },
-      child: Card(
-        margin: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 4,
-        ), // Tighter vertical margin
-        color: Colors.white.withValues(alpha: 0.05), // Darker/Grayed out
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ), // Smaller radius
-        child: InkWell(
-          onTap: () async {
-            // still navigate if they really want to re-read
-            await Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) =>
-                    WebViewScreen(url: item.link, title: item.title),
-                fullscreenDialog: true,
-              ),
-            );
-          },
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16.0,
-              vertical: 12.0,
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.check_circle_outline,
-                  size: 16,
-                  color: Colors.white24,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    item.title,
-                    style: const TextStyle(
-                      color: Colors.white54, // Dim text
-                      fontSize: 14,
-                      fontWeight: FontWeight.normal,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+  Future<void> _setRead(FeedItem item, bool read) async {
+    if (read) {
+      await _feedService.markArticleAsRead(item.link);
+    } else {
+      await _feedService.markArticleAsUnread(item.link);
+    }
+    if (mounted) setState(() {});
   }
 
-  Widget _buildStandardCard(FeedItem item) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Colors.white.withValues(alpha: 0.1),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        onTap: () async {
-          // Mark as read
-          await _feedService.markArticleAsRead(item.link);
-
-          if (!mounted) return;
-
-          // Navigate to WebView
-          await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) =>
-                  WebViewScreen(url: item.link, title: item.title),
-              fullscreenDialog: true,
-            ),
-          );
-
-          // Upon return, just trigger a rebuild so the item turns into a mini card
-          if (mounted) {
-            setState(() {});
-          }
-        },
-        onLongPress: () {
-          showDialog(
+  Future<void> _actOnArticle(FeedItem item, _ArticleAction action) async {
+    try {
+      switch (action) {
+        case _ArticleAction.toggleRead:
+          await _setRead(item, !_feedService.isArticleRead(item.link));
+        case _ArticleAction.hide:
+          final confirmed = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
-              backgroundColor: const Color(
-                0xFF1E293B,
-              ), // Matches card/theme color somewhat
-              title: const Text(
-                'Hide Source',
-                style: TextStyle(color: Colors.white),
-              ),
+              title: const Text('Hide source?'),
               content: Text(
-                'Stop showing articles from "${item.source}"?',
-                style: const TextStyle(color: Colors.white70),
+                'Hide articles from ${item.source}? You can follow it again in Sources.',
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(color: Colors.white60),
-                  ),
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
                 ),
-                TextButton(
-                  onPressed: () async {
-                    // Capture scaffold messenger before async gap
-                    final scaffoldMessenger = ScaffoldMessenger.of(context);
-                    Navigator.pop(context);
-
-                    await _feedService.disableFeedSource(item.sourceUrl);
-
-                    if (mounted) {
-                      setState(() {
-                        _items.removeWhere(
-                          (i) => i.sourceUrl == item.sourceUrl,
-                        );
-                      });
-
-                      scaffoldMessenger.showSnackBar(
-                        SnackBar(
-                          content: Text('Hidden ${item.source}'),
-                          backgroundColor: const Color(0xFF1E293B),
-                          action: SnackBarAction(
-                            label: 'Undo',
-                            onPressed: () {
-                              // Re-enable logic would go here
-                            },
-                          ),
-                        ),
-                      );
-                    }
-                  },
-                  child: const Text(
-                    'Hide',
-                    style: TextStyle(color: Colors.redAccent),
-                  ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Hide'),
                 ),
               ],
             ),
           );
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${item.source} • ${item.category}',
-                      style: TextStyle(
-                        color: Colors.indigoAccent[100],
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      item.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (item.publishedDate != null)
-                      Text(
-                        DateFormat.yMMMd().add_jm().format(item.publishedDate!),
-                        style: TextStyle(color: Colors.grey[400], fontSize: 12),
-                      ),
-                  ],
-                ),
-              ),
-              if (item.imageUrl != null) ...[
-                const SizedBox(width: 16),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: CachedNetworkImage(
-                    imageUrl: item.imageUrl!,
-                    width: 68,
-                    height: 68,
-                    memCacheWidth:
-                        204, // Optimization: Decode only what we need (68 * 3x pixel density)
-                    memCacheHeight: 204,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      width: 68,
-                      height: 68,
-                      color: Colors.white.withValues(alpha: 0.05),
-                      child: const Center(
-                        child: Icon(Icons.image, color: Colors.grey),
-                      ),
-                    ),
-                    errorWidget: (context, url, error) =>
-                        const SizedBox.shrink(),
-                    fadeInDuration: const Duration(milliseconds: 300),
-                  ),
-                ),
-              ] else if (item.sourceIconUrl != null) ...[
-                // Fallback to source icon if no article image
-                const SizedBox(width: 16),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: CachedNetworkImage(
-                    imageUrl: item.sourceIconUrl!,
-                    width: 68,
-                    height: 68,
-                    // Favicons might be small, so we might not want memCacheWidth large or maybe we do to avoid blur if upscaled?
-                    // Actually Google Favicons with sz=64 are 64x64. Upscaling 68x68 is fine.
-                    fit: BoxFit.contain, // Contain so we don't crop the logo
-                    placeholder: (context, url) =>
-                        const SizedBox(width: 68, height: 68),
-                    errorWidget: (context, url, error) =>
-                        const SizedBox.shrink(),
-                    fadeInDuration: const Duration(milliseconds: 300),
-                  ),
+          if (confirmed != true) return;
+          await _feedService.disableFeedSource(item.sourceUrl);
+          if (!mounted) return;
+          setState(() {
+            _readingList.removeWhere(
+              (entry) => entry.sourceUrl == item.sourceUrl,
+            );
+            _articles.removeWhere((entry) => entry.sourceUrl == item.sourceUrl);
+          });
+          _notify('Hidden ${item.source}');
+          widget.onSourcesChanged();
+      }
+    } catch (_) {
+      if (mounted) _notify('Couldn’t update the article or source.');
+    }
+  }
+
+  void _notify(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = _showAll ? _articles : _readingList;
+    return Theme(
+      data: ThemeData.dark(useMaterial3: true),
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0F172A),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF0F172A),
+          title: Text(_showAll ? 'All articles' : 'Reading list'),
+          actions: [
+            IconButton(
+              tooltip: 'Sources',
+              icon: const Icon(Icons.rss_feed),
+              onPressed: _openSources,
+            ),
+            PopupMenuButton<bool>(
+              onSelected: (showAll) => setState(() => _showAll = showAll),
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: !_showAll,
+                  child: Text(_showAll ? 'Reading list' : 'All articles'),
                 ),
               ],
-            ],
+            ),
+          ],
+        ),
+        body: _loading && items.isEmpty
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: () => _load(refresh: true),
+                child: items.isEmpty ? _emptyList() : _articleList(items),
+              ),
+      ),
+    );
+  }
+
+  Widget _emptyList() {
+    final message = _failed
+        ? 'Couldn’t load articles.'
+        : !_showAll && _articles.isNotEmpty
+        ? 'You’re caught up.'
+        : 'No articles found.';
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(24, 48, 24, 16),
+      children: [
+        Text(message, textAlign: TextAlign.center),
+        const SizedBox(height: 12),
+        Center(
+          child: FilledButton.tonal(
+            onPressed: () => _load(refresh: true),
+            child: const Text('Refresh'),
           ),
         ),
+        Center(
+          child: TextButton(
+            onPressed: _openSources,
+            child: const Text('Browse sources'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _articleList(List<FeedItem> items) {
+    final more = _showAll || _loading ? <FeedItem>[] : _nextPicks();
+    return ListView.builder(
+      key: PageStorageKey(_showAll),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
+      itemCount: items.length + (_showAll ? 0 : 1),
+      itemBuilder: (context, index) {
+        if (index == items.length) {
+          return Padding(
+            padding: const EdgeInsets.all(20),
+            child: Center(
+              child: _loading
+                  ? const LinearProgressIndicator()
+                  : more.isNotEmpty
+                  ? FilledButton.tonalIcon(
+                      onPressed: () =>
+                          setState(() => _readingList.addAll(more)),
+                      icon: const Icon(Icons.expand_more),
+                      label: const Text('More picks'),
+                    )
+                  : const Text(
+                      'End of the reading list',
+                      style: TextStyle(color: Colors.white60),
+                    ),
+            ),
+          );
+        }
+        final item = items[index];
+        final read = _feedService.isArticleRead(item.link);
+        return Dismissible(
+          key: ValueKey(item.link),
+          confirmDismiss: (_) async {
+            await _actOnArticle(item, _ArticleAction.toggleRead);
+            return false;
+          },
+          background: ColoredBox(
+            color: const Color(0xFF25324B),
+            child: Center(
+              child: Text(read ? 'Mark as unread' : 'Mark as read'),
+            ),
+          ),
+          child: _articleCard(item, read),
+        );
+      },
+    );
+  }
+
+  Widget _articleCard(FeedItem item, bool read) {
+    return FeedArticleCard(
+      item: item,
+      read: read,
+      onOpen: () => _openArticle(item),
+      actions: PopupMenuButton<_ArticleAction>(
+        tooltip: 'Article options',
+        icon: const Icon(Icons.more_vert, size: 18),
+        onSelected: (action) => _actOnArticle(item, action),
+        itemBuilder: (_) => [
+          PopupMenuItem(
+            value: _ArticleAction.toggleRead,
+            child: Text(read ? 'Mark as unread' : 'Mark as read'),
+          ),
+          const PopupMenuItem(
+            value: _ArticleAction.hide,
+            child: Text('Hide source'),
+          ),
+        ],
       ),
     );
   }

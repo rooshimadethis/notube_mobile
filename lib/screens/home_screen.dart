@@ -17,7 +17,9 @@ import 'gratitude_journal_screen.dart';
 import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.isActive = true});
+
+  final bool isActive;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -65,6 +67,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) {
+      _checkGratitudeJournal();
+    }
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkGratitudeJournal();
@@ -73,7 +83,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _checkGratitudeJournal() async {
     // Only show if HomeScreen is the current top route (don't stack if Settings or Journal already open)
-    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+    // The indexed stack keeps Home mounted while Read owns the visible tab.
+    if (!mounted || !widget.isActive || ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
 
     final prefs = await SharedPreferences.getInstance();
     final show = prefs.getBool('showGratitudeJournal') ?? true;
@@ -93,10 +106,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     }
 
-    if (shouldShow && mounted) {
+    if (shouldShow && mounted && widget.isActive &&
+        ModalRoute.of(context)?.isCurrent == true) {
       await prefs.setInt('lastGratitudeShownTime', now.millisecondsSinceEpoch);
       
-      if (!mounted) return;
+      if (!mounted || !widget.isActive || ModalRoute.of(context)?.isCurrent != true) {
+        return;
+      }
 
       Navigator.of(context).push(
         MaterialPageRoute(

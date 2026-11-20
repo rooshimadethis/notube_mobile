@@ -15,6 +15,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/feed_item.dart';
 import '../models/feed_source.dart';
 import '../models/feed_cache.dart';
+import 'feed_discovery.dart';
+import 'small_web_discovery.dart';
 
 class FeedService {
   static final FeedService _instance = FeedService._internal();
@@ -22,6 +24,7 @@ class FeedService {
   FeedService._internal();
 
   final http.Client _client = http.Client();
+  late final _smallWeb = SmallWebDiscovery(_client);
   // final SentimentAiService _aiService = SentimentAiService(); // Disabled
   // bool _aiInitialized = false; // Disabled
 
@@ -29,6 +32,13 @@ class FeedService {
   // But for now we just load every time or rely on caller to manage state
 
   static const String _feedPreferencesKey = 'feed_preferences';
+  static const String _customSourcesKey = 'custom_feed_sources';
+  static const _previousFeedUrls = {
+    'https://www.quantamagazine.org/feed/':
+        'http://www.quantamagazine.org/feed/',
+    'https://news.ycombinator.com/rss': 'http://news.ycombinator.com/rss',
+  };
+  Future<void> _sourceWrites = Future.value();
   static const String _readArticlesKey = 'read_articles';
 
   // Limit strictly to keep 'markArticleAsRead' fast (disk write on every tap).
@@ -88,7 +98,7 @@ class FeedService {
   }
 
   Future<List<FeedSource>> loadFeedSources() async {
-    final List<FeedSource> sources = [];
+    final sources = <FeedSource>{};
     try {
       // Load feeds.opml
       final feedsOpml = await rootBundle.loadString('feeds.opml');
@@ -96,8 +106,62 @@ class FeedService {
     } catch (e) {
       developer.log("Error loading OPML assets: $e");
     }
-    return sources; // Duplicates handled in parsing or assumed unique by URL
+    sources.addAll(await _loadCustomSources());
+    return sources.toList();
   }
+
+  Future<List<FeedSource>> _loadCustomSources() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getStringList(_customSourcesKey) ?? [];
+    final sources = <FeedSource>[];
+    for (final entry in saved) {
+      try {
+        final value = jsonDecode(entry) as Map<String, dynamic>;
+        sources.add(
+          FeedSource(
+            title: value['title'] as String,
+            url: value['url'] as String,
+            category: 'My sources',
+          ),
+        );
+      } on Exception {
+        continue;
+      } on TypeError {
+        continue;
+      }
+    }
+    return sources;
+  }
+
+  Future<List<FeedSource>> discoverFeeds(String address) =>
+      FeedDiscovery(_client).find(address);
+
+  Future<List<FeedSource>> loadSmallWebSources() async {
+    final known = await loadFeedSources();
+    final preferences = await getFeedPreferences();
+    return _smallWeb.load(
+      now: DateTime.now(),
+      excludedHosts: {
+        ...known.map((source) => SmallWebDiscovery.publisherHost(source.url)),
+        ...preferences.keys.map(SmallWebDiscovery.publisherHost),
+      },
+    );
+  }
+
+  Future<void> followSource(FeedSource source) => _writeSources(() async {
+    final known = await loadFeedSources();
+    if (!known.contains(source)) {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getStringList(_customSourcesKey) ?? [];
+      final didSave = await prefs.setStringList(_customSourcesKey, [
+        ...saved,
+        jsonEncode({'title': source.title, 'url': source.url}),
+      ]);
+      if (!didSave) throw StateError('Couldn’t save the source.');
+      return;
+    }
+    await _setFeedEnabled(source.url, true);
+  });
 
   // Returns Map<Url, IsEnabled>
   Future<Map<String, bool>> getFeedPreferences() async {
@@ -116,10 +180,22 @@ class FeedService {
 
   Future<void> _savePreferences(Map<String, bool> preferences) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_feedPreferencesKey, jsonEncode(preferences));
+    if (!await prefs.setString(_feedPreferencesKey, jsonEncode(preferences))) {
+      throw StateError('Couldn’t save source preferences.');
+    }
   }
 
-  Future<void> updateFeedEnabledState(String url, bool isEnabled) async {
+  Future<void> _writeSources(Future<void> Function() write) {
+    // Each change must see the preceding write, even when switches are tapped quickly.
+    final pending = _sourceWrites.then((_) => write());
+    _sourceWrites = pending.then<void>((_) {}, onError: (Object _) {});
+    return pending;
+  }
+
+  Future<void> updateFeedEnabledState(String url, bool isEnabled) =>
+      _writeSources(() => _setFeedEnabled(url, isEnabled));
+
+  Future<void> _setFeedEnabled(String url, bool isEnabled) async {
     final prefs = await getFeedPreferences();
     prefs[url] = isEnabled;
     await _savePreferences(prefs);
@@ -130,16 +206,22 @@ class FeedService {
   }
 
   bool isFeedEnabled(FeedSource source, Map<String, bool> preferences) {
-    // If user has an explicit preference, use it. Otherwise use default.
-    return preferences[source.url] ?? source.enabled;
+    return preferences[source.url] ??
+        preferences[_previousFeedUrls[source.url]] ??
+        source.enabled;
   }
 
-  // Helper to get only enabled URLs
-  Future<List<FeedSource>> getEnabledFeedSources() async {
-    final allSources = await loadFeedSources();
-    final prefs = await getFeedPreferences();
+  bool isSuggestedSource(FeedSource source, Map<String, bool> preferences) =>
+      source.suggested && isDiscoverableSource(source, preferences);
 
-    return allSources.where((s) => isFeedEnabled(s, prefs)).toList();
+  bool isDiscoverableSource(FeedSource source, Map<String, bool> preferences) {
+    // Explicitly hidden sources stay in Settings so discovery doesn't suggest them again.
+    final host = Uri.tryParse(source.url)?.host ?? '';
+    return !isFeedEnabled(source, preferences) &&
+        !preferences.containsKey(source.url) &&
+        !preferences.containsKey(_previousFeedUrls[source.url]) &&
+        host != 'youtube.com' &&
+        !host.endsWith('.youtube.com');
   }
 
   List<FeedSource> _parseOpml(String opmlContent) {
@@ -181,6 +263,7 @@ class FeedService {
               url: xmlUrl,
               category: category,
               enabled: isEnabled,
+              suggested: node.getAttribute('suggested') == 'true',
               iconUrl: iconUrl,
             ),
           );
@@ -216,11 +299,8 @@ class FeedService {
       // Ensure read articles are loaded locally
       if (!_readArticlesLoaded) await loadReadArticles();
 
-      // 1. Remove deselected feeds from cache
-      final sourceUrls = sources.map((s) => s.url).toSet();
-      _cache.removeWhere((url, _) => !sourceUrls.contains(url));
-
-      // 2. Prepare initial state from cache
+      // Aggregate only the requested URLs. Older refreshes may still be using
+      // other cache entries while the user changes source preferences.
       final currentItems = <FeedItem>[];
       final List<FeedSource> sourcesToFetch = [];
 
@@ -259,7 +339,7 @@ class FeedService {
         return;
       }
 
-      // 3. Parallel Fetching
+      // Parallel fetching.
       // We process each source in parallel. When one finishes, we update the stream.
       // We must guard against controller being closed if widget is disposed.
 
@@ -375,16 +455,19 @@ class FeedService {
       if (etag != null) headers['If-None-Match'] = etag;
       if (lastModified != null) headers['If-Modified-Since'] = lastModified;
 
-      final response = await _client
-          .get(Uri.parse(source.url), headers: headers)
-          .timeout(const Duration(seconds: 10));
+      final address = Uri.parse(source.url);
+      final (baseUrl, response) = await (() async {
+        final fetch = await requestFeedUrl(_client, address, headers: headers);
+        return (fetch.url, await http.Response.fromStream(fetch.response));
+      })().timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 304) {
         return FetchResult.notModified();
       } else if (response.statusCode == 200) {
         final items = await compute(_parseAndFilterFeed, {
-          'xml': response.body,
+          'xml': _decodeFeed(response),
           'url': source.url,
+          'baseUrl': baseUrl,
           'category': source.category,
           'iconUrl': source.iconUrl,
         });
@@ -403,6 +486,16 @@ class FeedService {
       developer.log("Error fetching feed ${source.url}: $e");
     }
     return FetchResult.error();
+  }
+}
+
+String _decodeFeed(http.Response response) {
+  // Some feeds omit charset. Let UTF-8 XML retain punctuation and emoji before
+  // falling back to the server's HTTP encoding for legacy feeds.
+  try {
+    return utf8.decode(response.bodyBytes);
+  } on FormatException {
+    return response.body;
   }
 }
 
@@ -437,8 +530,15 @@ List<FeedItem> _parseAndFilterFeed(Map<String, dynamic> args) {
   final feedUrl = args['url'] as String;
   final category = args['category'] as String;
   final sourceIconUrl = args['iconUrl'] as String?;
+  final baseUrl = args['baseUrl'] as Uri;
 
-  final items = _parseFeedXml(xmlString, feedUrl, category, sourceIconUrl);
+  final items = _parseFeedXml(
+    xmlString,
+    feedUrl,
+    baseUrl,
+    category,
+    sourceIconUrl,
+  );
 
   // Create ML sentiment analyzer with custom negative words
   // final mlAnalyzer = _createSentimentAnalyzer();
@@ -496,6 +596,7 @@ List<FeedItem> _parseAndFilterFeed(Map<String, dynamic> args) {
 List<FeedItem> _parseFeedXml(
   String xmlString,
   String feedUrl,
+  Uri baseUrl,
   String category,
   String? sourceIconUrl,
 ) {
@@ -505,13 +606,13 @@ List<FeedItem> _parseFeedXml(
     // Check for RSS
     final rss = document.findAllElements('rss').firstOrNull;
     if (rss != null) {
-      return _parseRss(document, category, feedUrl, sourceIconUrl);
+      return _parseRss(document, category, feedUrl, baseUrl, sourceIconUrl);
     }
 
     // Check for Atom
     final feed = document.findAllElements('feed').firstOrNull;
     if (feed != null) {
-      return _parseAtom(document, category, feedUrl, sourceIconUrl);
+      return _parseAtom(document, category, feedUrl, baseUrl, sourceIconUrl);
     }
 
     // RDF/RSS 1.0
@@ -521,6 +622,7 @@ List<FeedItem> _parseFeedXml(
         document,
         category,
         feedUrl,
+        baseUrl,
         sourceIconUrl,
       ); // Structure is similar enough mostly
     }
@@ -534,6 +636,7 @@ List<FeedItem> _parseRss(
   XmlDocument document,
   String category,
   String sourceUrl,
+  Uri baseUrl,
   String? sourceIconUrl,
 ) {
   final items = <FeedItem>[];
@@ -544,7 +647,11 @@ List<FeedItem> _parseRss(
   for (var node in document.findAllElements('item')) {
     final title =
         node.findElements('title').firstOrNull?.innerText ?? 'No Title';
-    final link = node.findElements('link').firstOrNull?.innerText ?? '';
+    final link = _articleUrl(
+      baseUrl,
+      node.findElements('link').firstOrNull?.innerText,
+    );
+    if (link == null) continue;
     final description =
         node.findElements('description').firstOrNull?.innerText ?? '';
     final pubDateStr = node.findElements('pubDate').firstOrNull?.innerText;
@@ -619,6 +726,7 @@ List<FeedItem> _parseAtom(
   XmlDocument document,
   String category,
   String sourceUrl,
+  Uri baseUrl,
   String? sourceIconUrl,
 ) {
   final items = <FeedItem>[];
@@ -631,14 +739,13 @@ List<FeedItem> _parseAtom(
         node.findElements('title').firstOrNull?.innerText ?? 'No Title';
 
     // Atom links are attributes usually
-    String link = '';
     final links = node.findElements('link');
-    final altLink = links.firstWhere(
-      (e) =>
-          e.getAttribute('rel') == 'alternate' || e.getAttribute('rel') == null,
-      orElse: () => links.first,
-    );
-    link = altLink.getAttribute('href') ?? '';
+    final altLink = links.where((element) {
+      final rel = element.getAttribute('rel');
+      return rel == null || rel == 'alternate';
+    }).firstOrNull;
+    final link = _articleUrl(baseUrl, altLink?.getAttribute('href'));
+    if (link == null) continue;
 
     final summary = node.findElements('summary').firstOrNull?.innerText ?? '';
     final content = node.findElements('content').firstOrNull?.innerText ?? '';
@@ -658,15 +765,14 @@ List<FeedItem> _parseAtom(
     String? imageUrl;
 
     // 1. enclosure link
-    final enclosureLink = links.firstWhere(
-      (e) =>
-          e.getAttribute('rel') == 'enclosure' &&
-          (e.getAttribute('type')?.startsWith('image/') ?? false),
-      orElse: () => XmlElement(XmlName('dummy')),
-    );
-    if (enclosureLink.name.local != 'dummy') {
-      imageUrl = enclosureLink.getAttribute('href');
-    }
+    final enclosureLink = links
+        .where(
+          (e) =>
+              e.getAttribute('rel') == 'enclosure' &&
+              (e.getAttribute('type')?.startsWith('image/') ?? false),
+        )
+        .firstOrNull;
+    imageUrl = enclosureLink?.getAttribute('href');
 
     // 2. media:content
     if (imageUrl == null) {
@@ -708,6 +814,20 @@ List<FeedItem> _parseAtom(
     );
   }
   return items;
+}
+
+String? _articleUrl(Uri base, String? value) {
+  final reference = value?.trim();
+  if (reference == null || reference.isEmpty) return null;
+  final uri = Uri.tryParse(reference);
+  if (uri == null) return null;
+  final target = base.resolveUri(uri);
+  if ((target.scheme != 'https' && target.scheme != 'http') ||
+      target.host.isEmpty ||
+      target.userInfo.isNotEmpty) {
+    return null;
+  }
+  return target.toString();
 }
 
 DateTime? _parseDate(String dateStr) {
